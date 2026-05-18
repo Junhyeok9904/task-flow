@@ -87,7 +87,9 @@ export default function ProgressPage() {
 
   const playMedia = (item: any) => {
     if (!audioEl) return;
-    audioEl.src = item.src || item.url;
+    const src = item.path || item.src || item.url;
+    // 상대경로면 현재 오리진 붙이기
+    audioEl.src = src.startsWith('http') ? src : window.location.origin + src;
     audioEl.play().catch(() => {});
     setPlayer(p => ({ ...p, current: item, isPlaying: true }));
   };
