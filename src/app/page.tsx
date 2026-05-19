@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { MediaFile, Playlist } from '../types';
 import Link from 'next/link';
+import { useUpload } from '../components/UploadManager';
+import { Icon } from '../components/ui/Icon';
+import { useAudioPlayer } from '../hooks/useAudioPlayer';
 
 function fmtTime(s: number) {
   if (!isFinite(s) || isNaN(s)) return '00:00';
@@ -43,6 +46,7 @@ function getGradientFromTitle(title: string) {
 }
 
 export default function Home() {
+  const { enqueueFiles } = useUpload();
   const [mounted, setMounted] = useState(false);
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
@@ -50,16 +54,13 @@ export default function Home() {
   const [search, setSearch] = useState('');
   const [view, setView] = useState<'songs' | 'playlists' | 'upload' | 'recent'>('songs');
   
-  // Active player states
-  const [currentFile, setCurrentFile] = useState<MediaFile | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.8);
-  const [queue, setQueue] = useState<MediaFile[]>([]);
-  const [queueIndex, setQueueIndex] = useState(0);
-  const [repeatMode, setRepeatMode] = useState<'none' | 'all' | 'one'>('none');
-  const [isShuffle, setIsShuffle] = useState(false);
+  const {
+    currentFile, setCurrentFile, isPlaying, setIsPlaying, currentTime, setCurrentTime,
+    duration, setDuration, volume, setVolume, queue, setQueue, queueIndex, setQueueIndex,
+    repeatMode, setRepeatMode, isShuffle, setIsShuffle, audioRef, videoRef, getMediaEl,
+    playPlaylistRewrite, playPlaylistAppend, handlePrev, handleNext, playFile, togglePlay,
+    seekBy, toggleShuffle, toggleRepeat
+  } = useAudioPlayer();
 
   // High-Fidelity UI states matching Dribbble mockup
   const [layoutMode, setLayoutMode] = useState<'grid' | 'list'>('grid');
@@ -86,8 +87,7 @@ export default function Home() {
     trackName: string;
   } | null>(null);
 
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+
 
   const loadData = async () => {
     try {
@@ -154,138 +154,7 @@ export default function Home() {
     } catch (e) { console.error(e); }
   };
 
-  const playPlaylistRewrite = (playlistTracks: MediaFile[]) => {
-    if (!playlistTracks.length) return;
-    setQueue(playlistTracks);
-    setQueueIndex(0);
-    playFile(playlistTracks[0]);
-  };
 
-  const playPlaylistAppend = (playlistTracks: MediaFile[]) => {
-    if (!playlistTracks.length) return;
-    setQueue(prev => {
-      const uniqueNew = playlistTracks.filter(newT => !prev.some(oldT => oldT.path === newT.path));
-      return [...prev, ...uniqueNew];
-    });
-    alert(`${playlistTracks.length}곡이 대기열에 추가되었습니다.`);
-  };
-
-  const getMediaEl = () => currentFile?.type === 'video' ? videoRef.current : audioRef.current;
-
-  // Handle skip previous
-  const handlePrev = useCallback(() => {
-    if (!queue.length) return;
-    let prev = queueIndex;
-    if (isShuffle) {
-      prev = Math.floor(Math.random() * queue.length);
-    } else {
-      prev = queueIndex - 1;
-      if (prev < 0) {
-        prev = repeatMode === 'all' ? queue.length - 1 : 0;
-      }
-    }
-    setQueueIndex(prev);
-    setCurrentFile(queue[prev]);
-    setIsPlaying(true);
-    setTimeout(() => {
-      const el = getMediaEl();
-      if (el) { el.currentTime = 0; el.play().catch(() => {}); }
-    }, 100);
-  }, [queue, queueIndex, repeatMode, isShuffle]);
-
-  // Handle skip next
-  const handleNext = useCallback((autoEnded?: boolean) => {
-    if (!queue.length) return;
-    if (autoEnded && repeatMode === 'one') {
-      const el = getMediaEl();
-      if (el) {
-        el.currentTime = 0;
-        el.play().catch(() => {});
-        setIsPlaying(true);
-      }
-      return;
-    }
-    let next = queueIndex;
-    if (isShuffle) {
-      next = Math.floor(Math.random() * queue.length);
-    } else {
-      next = queueIndex + 1;
-      if (next >= queue.length) {
-        if (repeatMode === 'all') {
-          next = 0;
-        } else {
-          setIsPlaying(false);
-          return;
-        }
-      }
-    }
-    setQueueIndex(next);
-    setCurrentFile(queue[next]);
-    setIsPlaying(true);
-    setTimeout(() => {
-      const el = getMediaEl();
-      if (el) { el.currentTime = 0; el.play().catch(() => {}); }
-    }, 100);
-  }, [queue, queueIndex, repeatMode, isShuffle]);
-
-  // Synchronization hook
-  useEffect(() => {
-    const el = getMediaEl();
-    if (!el) return;
-    const onTimeUpdate = () => setCurrentTime(el.currentTime);
-    const onMeta = () => setDuration(el.duration);
-    const onEnded = () => { setIsPlaying(false); handleNext(true); };
-    el.addEventListener('timeupdate', onTimeUpdate);
-    el.addEventListener('loadedmetadata', onMeta);
-    el.addEventListener('ended', onEnded);
-    return () => {
-      el.removeEventListener('timeupdate', onTimeUpdate);
-      el.removeEventListener('loadedmetadata', onMeta);
-      el.removeEventListener('ended', onEnded);
-    };
-  }, [currentFile, handleNext]);
-
-  useEffect(() => {
-    const el = getMediaEl();
-    if (el) el.volume = volume;
-  }, [volume, currentFile]);
-
-  const playFile = useCallback((file: MediaFile) => {
-    setCurrentFile(file);
-    setIsPlaying(true);
-    setCurrentTime(0);
-    setDuration(0);
-    setQueue(prev => prev.some(q => q.path === file.path) ? prev : [file, ...prev]);
-    setQueueIndex(0);
-  }, []);
-
-  const togglePlay = useCallback(() => {
-    const el = getMediaEl();
-    if (!el) return;
-    if (isPlaying) {
-      el.pause();
-    } else {
-      el.play().catch(() => {});
-    }
-    setIsPlaying(!isPlaying);
-  }, [isPlaying, currentFile]);
-
-  const seekBy = (delta: number) => {
-    const el = getMediaEl();
-    if (!el) return;
-    const dur = el.duration;
-    if (!isFinite(dur) || dur === 0) return;
-    el.currentTime = Math.max(0, Math.min(dur, el.currentTime + delta));
-  };
-
-  const toggleShuffle = () => setIsShuffle(prev => !prev);
-  const toggleRepeat = () => {
-    setRepeatMode(prev => {
-      if (prev === 'none') return 'all';
-      if (prev === 'all') return 'one';
-      return 'none';
-    });
-  };
 
   const createPlaylist = async () => {
     if (!newPlaylistName.trim()) return;
@@ -406,10 +275,7 @@ export default function Home() {
 
   const handleUpload = async (files: FileList | null) => {
     if (!files?.length) return;
-    const fd = new FormData();
-    Array.from(files).forEach(f => fd.append('file', f));
-    await fetch('/api/media', { method: 'POST', body: fd });
-    await loadData();
+    enqueueFiles(Array.from(files));
   };
 
   const onDrop = async (e: React.DragEvent) => {
@@ -450,24 +316,24 @@ export default function Home() {
             {/* Nav icons */}
             <div className="flex flex-col items-center gap-5 w-full mt-4">
               <button onClick={() => { setView('songs'); setSelectedPlaylistId(null); }} className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-[#181b24] text-emerald-400 relative transition group">
-                <span className="text-lg">🏠</span>
+                <Icon name="home" size={20} />
                 <span className="absolute left-0 top-3 w-1 h-3 bg-emerald-500 rounded-r-md"></span>
               </button>
               
               <button onClick={() => { setView('playlists'); }} className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-[#181b24] text-gray-500 hover:text-gray-300 transition">
-                <span className="text-lg">🎛️</span>
+                <Icon name="library" size={20} />
               </button>
               
               <Link href="/progress" className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-[#181b24] text-gray-500 hover:text-gray-300 transition">
-                <span className="text-lg">📊</span>
+                <Icon name="analytics" size={20} />
               </Link>
               
               <button onClick={() => setView('upload')} className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-[#181b24] text-gray-500 hover:text-gray-300 transition">
-                <span className="text-lg">☁️</span>
+                <Icon name="upload" size={20} />
               </button>
               
               <button onClick={() => setView('recent')} className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-[#181b24] text-gray-500 hover:text-gray-300 transition">
-                <span className="text-lg">⭐</span>
+                <Icon name="recent" size={20} />
               </button>
             </div>
           </div>
@@ -490,19 +356,19 @@ export default function Home() {
                 onClick={() => { setView('songs'); setSelectedPlaylistId(null); }} 
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition ${view === 'songs' && !selectedPlaylistId ? 'bg-[#181b24] text-white shadow border border-gray-800' : 'text-gray-400 hover:bg-[#121319] hover:text-gray-200'}`}
               >
-                <span>📁</span> My Library
+                <Icon name="folder" size={16} /> My Library
               </button>
               <button 
                 onClick={() => { setView('playlists'); }} 
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition ${view === 'playlists' ? 'bg-[#181b24] text-white border border-gray-800' : 'text-gray-400 hover:bg-[#121319] hover:text-gray-200'}`}
               >
-                <span>🗒️</span> Playlists
+                <Icon name="library" size={16} /> Playlists
               </button>
               <button 
                 onClick={() => setView('recent')} 
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition ${view === 'recent' ? 'bg-[#181b24] text-white border border-gray-800' : 'text-gray-400 hover:bg-[#121319] hover:text-gray-200'}`}
               >
-                <span>🕐</span> Recently Added
+                <Icon name="recent" size={16} /> Recently Added
               </button>
             </div>
 
@@ -613,21 +479,21 @@ export default function Home() {
                   placeholder="Search songs, artists, uploads..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-[#12131a] border border-gray-800 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500/80 text-gray-200 transition-all placeholder-gray-600"
+                  className="w-full pl-10 pr-4 py-2 bg-[#12131a] border border-gray-800 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500/80 text-gray-200 transition-all placeholder-gray-600"
                 />
-                <span className="absolute left-3.5 top-2.5 text-xs text-gray-600">🔍</span>
+                <span className="absolute left-3.5 top-2 text-gray-500"><Icon name="search" size={18} /></span>
               </div>
             </div>
 
             {/* Notifications & avatar tags */}
             <div className="flex items-center gap-4">
-              <button className="text-gray-400 hover:text-gray-200 text-sm relative">
-                🔔
-                <span className="absolute top-0 right-0 w-1.5 h-1.5 bg-rose-500 rounded-full"></span>
+              <button className="text-gray-400 hover:text-gray-200 relative p-1 transition">
+                <Icon name="bell" size={20} />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full border border-[#0b0c10]"></span>
               </button>
               
               <div className="flex items-center gap-2 bg-[#12131a] px-3 py-1.5 rounded-full border border-gray-800 cursor-pointer hover:bg-[#181b24] transition text-xs font-semibold">
-                <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center text-[9px] text-black">👤</div>
+                <div className="w-5 h-5 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400"><Icon name="user" size={14} /></div>
                 <span>Profile</span>
                 <span className="text-[10px] text-gray-500">▼</span>
               </div>
