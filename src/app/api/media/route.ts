@@ -59,3 +59,21 @@ export async function GET() {
   
   return NextResponse.json(mediaFiles);
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const filename = searchParams.get('filename');
+    if (!filename) return NextResponse.json({ error: 'No filename provided' }, { status: 400 });
+
+    const targetPath = path.join(process.cwd(), 'public', 'media', filename);
+    if (fs.existsSync(targetPath)) {
+      fs.unlinkSync(targetPath);
+      return NextResponse.json({ success: true, message: 'File deleted successfully' });
+    } else {
+      return NextResponse.json({ error: 'File not found' }, { status: 404 });
+    }
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message || 'Deletion failed' }, { status: 500 });
+  }
+}

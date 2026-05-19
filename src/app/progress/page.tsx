@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 
 interface PlayerState {
@@ -39,6 +39,8 @@ export default function ProgressPage() {
 
   const [mediaList, setMediaList] = useState<any[]>([]);
   const [volume, setVolume] = useState(0.8);
+  const [repeatMode, setRepeatMode] = useState<'none' | 'all' | 'one'>('none');
+  const [isShuffle, setIsShuffle] = useState(false);
 
   // ── 인라인 편집 상태 ──
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -66,11 +68,84 @@ export default function ProgressPage() {
     loadMedia();
   }, []);
 
+  const playMedia = useCallback((item: any) => {
+    if (!audioEl) return;
+    const src = item.path || item.src || item.url || item.filePath;
+    // 상대경로면 현재 오리진 붙이기
+    audioEl.src = src.startsWith('http') ? src : window.location.origin + src;
+    audioEl.play().catch(() => {});
+    setPlayer(p => ({ ...p, current: { name: item.name || item.title || 'Unknown', src, type: item.type || 'audio' }, isPlaying: true }));
+  }, [audioEl]);
+
+  const handleNext = useCallback((autoEnded?: boolean) => {
+    if (!audioEl || !mediaList.length) return;
+    if (autoEnded && repeatMode === 'one') {
+      audioEl.currentTime = 0;
+      audioEl.play().catch(() => {});
+      setPlayer(p => ({ ...p, isPlaying: true }));
+      return;
+    }
+
+    let nextIdx = 0;
+    if (player.current) {
+      const curIdx = mediaList.findIndex(m => m.path === player.current?.src || m.src === player.current?.src);
+      if (curIdx !== -1) {
+        if (isShuffle) {
+          nextIdx = Math.floor(Math.random() * mediaList.length);
+        } else {
+          nextIdx = curIdx + 1;
+          if (nextIdx >= mediaList.length) {
+            if (repeatMode === 'all') {
+              nextIdx = 0;
+            } else {
+              setPlayer(p => ({ ...p, isPlaying: false, currentTime: 0 }));
+              return;
+            }
+          }
+        }
+      }
+    }
+    const nextSong = mediaList[nextIdx];
+    playMedia(nextSong);
+  }, [audioEl, mediaList, player.current, repeatMode, isShuffle, playMedia]);
+
+  const handlePrev = useCallback(() => {
+    if (!audioEl || !mediaList.length) return;
+    let prevIdx = 0;
+    if (player.current) {
+      const curIdx = mediaList.findIndex(m => m.path === player.current?.src || m.src === player.current?.src);
+      if (curIdx !== -1) {
+        if (isShuffle) {
+          prevIdx = Math.floor(Math.random() * mediaList.length);
+        } else {
+          prevIdx = curIdx - 1;
+          if (prevIdx < 0) {
+            prevIdx = repeatMode === 'all' ? mediaList.length - 1 : 0;
+          }
+        }
+      }
+    }
+    const prevSong = mediaList[prevIdx];
+    playMedia(prevSong);
+  }, [audioEl, mediaList, player.current, repeatMode, isShuffle, playMedia]);
+
+  const toggleShuffle = () => {
+    setIsShuffle(prev => !prev);
+  };
+
+  const toggleRepeat = () => {
+    setRepeatMode(prev => {
+      if (prev === 'none') return 'all';
+      if (prev === 'all') return 'one';
+      return 'none';
+    });
+  };
+
   useEffect(() => {
     if (!audioEl) return;
     const tick = () => setPlayer(p => ({ ...p, currentTime: audioEl.currentTime }));
     const onMeta = () => setPlayer(p => ({ ...p, duration: audioEl.duration }));
-    const onEnded = () => setPlayer(p => ({ ...p, isPlaying: false, currentTime: 0 }));
+    const onEnded = () => { handleNext(true); };
     audioEl.addEventListener('timeupdate', tick);
     audioEl.addEventListener('loadedmetadata', onMeta);
     audioEl.addEventListener('ended', onEnded);
@@ -79,20 +154,11 @@ export default function ProgressPage() {
       audioEl.removeEventListener('loadedmetadata', onMeta);
       audioEl.removeEventListener('ended', onEnded);
     };
-  }, [audioEl]);
+  }, [audioEl, handleNext]);
 
   useEffect(() => {
     if (audioEl) audioEl.volume = volume;
   }, [volume, audioEl]);
-
-  const playMedia = (item: any) => {
-    if (!audioEl) return;
-    const src = item.path || item.src || item.url;
-    // 상대경로면 현재 오리진 붙이기
-    audioEl.src = src.startsWith('http') ? src : window.location.origin + src;
-    audioEl.play().catch(() => {});
-    setPlayer(p => ({ ...p, current: item, isPlaying: true }));
-  };
 
   const togglePlay = () => {
     if (!audioEl || !player.current) return;
@@ -282,15 +348,47 @@ export default function ProgressPage() {
           )}
         </div>
         <div className="flex flex-col items-center flex-1 gap-1">
-          <button onClick={togglePlay} className="text-2xl hover:text-blue-400 disabled:text-gray-600" disabled={!player.current}>
-            {player.isPlaying ? '⏸' : '▶'}
-          </button>
+          {/* 컨트롤 (재생/일시정지, 이전, 다음, 셔플, 반복) */}
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={toggleShuffle} 
+              className={`text-base transition-colors ${isShuffle ? 'text-blue-400 hover:text-blue-300' : 'text-gray-500 hover:text-gray-400'}`}
+              title="Shuffle"
+              disabled={!player.current}
+            >
+              🔀
+            </button>
+            <button onClick={handlePrev} className="text-xl hover:text-blue-400 text-gray-400" disabled={!player.current}>⏮</button>
+            <button onClick={togglePlay} className="text-2xl hover:text-blue-400 text-white disabled:text-gray-600" disabled={!player.current}>
+              {player.isPlaying ? '⏸' : '▶'}
+            </button>
+            <button onClick={() => handleNext(false)} className="text-xl hover:text-blue-400 text-gray-400" disabled={!player.current}>⏭</button>
+            <button 
+              onClick={toggleRepeat} 
+              className={`text-base transition-colors ${repeatMode !== 'none' ? 'text-blue-400 hover:text-blue-300' : 'text-gray-500 hover:text-gray-400'}`}
+              title={repeatMode === 'one' ? 'Repeat One' : repeatMode === 'all' ? 'Repeat All' : 'Repeat Off'}
+              disabled={!player.current}
+            >
+              {repeatMode === 'one' ? '🔂' : '🔁'}
+            </button>
+          </div>
           <div className="flex items-center gap-2 text-xs">
             <span className="font-mono w-10 text-right">{fmt(player.currentTime)}</span>
             <button onClick={() => seekBy(-SKIP)} className="px-2 py-1 bg-gray-700 rounded hover:bg-gray-600 text-xs">-{SKIP}</button>
-            <div className="h-1.5 bg-gray-700 rounded-full w-48 overflow-hidden">
-              <div className="h-full bg-blue-500 transition-all" style={{ width: player.duration ? `${(player.currentTime / player.duration) * 100}%` : '0%' }} />
-            </div>
+            <input
+              type="range"
+              min="0"
+              max={player.duration || 0}
+              value={player.currentTime}
+              onChange={e => {
+                const val = parseFloat(e.target.value);
+                if (audioEl) {
+                  audioEl.currentTime = val;
+                  setPlayer(p => ({ ...p, currentTime: val }));
+                }
+              }}
+              className="w-48 h-1.5 accent-blue-500 bg-gray-700 rounded-full appearance-none cursor-pointer"
+            />
             <button onClick={() => seekBy(SKIP)} className="px-2 py-1 bg-gray-700 rounded hover:bg-gray-600 text-xs">+{SKIP}</button>
             <span className="font-mono w-10">{fmt(player.duration)}</span>
           </div>

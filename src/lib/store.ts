@@ -71,21 +71,86 @@ export function deleteTask(id: string): boolean {
   return true;
 }
 
-// Initialize with 200 sample tasks
+// Initialize with actual media player roadmap tasks
 export function initializeTasks(): void {
   const existing = getTasks();
   if (existing.length > 0) return;
   
-  const sampleTasks: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>[] = Array.from({ length: 200 }, (_, i) => ({
-    title: `작업 항목 ${i + 1}`,
-    description: `이것은 작업 항목 ${i + 1}에 대한 설명입니다.`,
-    status: 'pending',
-    checked: false,
-  }));
+  const sampleTasks: Omit<Task, 'createdAt' | 'updatedAt'>[] = [
+    {
+      id: "roadmap_task_1",
+      title: "[기능] 미디어 플레이어 한 곡 반복 / 전체 반복 토글 구현",
+      description: "플레이바에 반복 재생 아이콘을 추가하고, 단일 곡 반복 및 전체 재생 목록 반복 상태를 원활하게 토글하는 제어 모듈을 구축합니다.",
+      status: "pending",
+      checked: false
+    },
+    {
+      id: "roadmap_task_2",
+      title: "[기능] 오디오 재생 셔플(Shuffle) 랜덤 믹스 모드 추가",
+      description: "재생 큐에 들어있는 곡들의 순서를 무작위로 섞는 셔플 재생 기능을 구축하여 감상 편의성을 대폭 개선합니다.",
+      status: "pending",
+      checked: false
+    },
+    {
+      id: "roadmap_task_3",
+      title: "[버그] 페이지 이동 시 오디오 백그라운드 중복 재생 이슈 해결",
+      description: "Progress 페이지와 메인 페이지 간 전환 시 오디오가 중복 재생되는 버그를 글로벌 오디오 컨텍스트 및 싱글톤 구조를 구현하여 수정합니다.",
+      status: "in_progress",
+      checked: false
+    },
+    {
+      id: "roadmap_task_4",
+      title: "[기능] 업로드 파일 메타데이터(앨범 아트, 아티스트명) 파싱",
+      description: "파일 업로드 시 오디오/비디오 헤더 데이터를 백엔드에서 분석하여 아티스트 이름과 앨범 아트 이미지를 추출하여 대시보드에 자동 렌더링합니다.",
+      status: "pending",
+      checked: false
+    },
+    {
+      id: "roadmap_task_5",
+      title: "[개선] Tailwind CSS v4 기반 다크 글래스모피즘 테마 전면 교체",
+      description: "기획된 프리미엄 다크 모드 목업 시안을 기준으로 네온 글로우 및 투명도 윈도우 스타일을 UI 전반에 완벽하게 입힙니다.",
+      status: "in_progress",
+      checked: false
+    },
+    {
+      id: "roadmap_task_6",
+      title: "[기능] 드래그 앤 드롭 방식의 인터랙티브 칸반 보드 구축",
+      description: "현재 /progress 경로의 정적 버튼 이동 방식을 개선하여, 마우스 드래그로 카드를 Pending/In Progress/Completed 열로 매끄럽게 이동시키는 드래그 앤 드롭 기능을 /board 경로에 구축합니다.",
+      status: "pending",
+      checked: false
+    },
+    {
+      id: "roadmap_task_7",
+      title: "[기능] 일일 체크리스트 및 반복 TODO 루틴 전용 위젯 구현",
+      description: "오늘 완수해야 하는 가볍고 직관적인 TO-DO 체크박스 컴포넌트를 모아보는 전용 checklist 페이지를 /checklist 경로에 완성합니다.",
+      status: "pending",
+      checked: false
+    },
+    {
+      id: "roadmap_task_8",
+      title: "[업데이트] 가상 JSON 스토어를 SQLite / Prisma 아키텍처로 마이그레이션",
+      description: "로컬 /data/*.json 파일 시스템 기반 저장소의 안정성 및 영속성을 확보하기 위해 내장형 SQLite 데이터베이스와 Prisma ORM 구조로 전환합니다.",
+      status: "pending",
+      checked: false
+    },
+    {
+      id: "roadmap_task_9",
+      title: "[개선] 비디오 플레이어 단축키 제어 및 전체화면 기능 구현",
+      description: "비디오 재생 시 스페이스바(재생/일시정지), 좌우 방향키(10초 스킵), F키(전체화면 토글) 단축키 핫키 리스너를 결합합니다.",
+      status: "completed",
+      checked: true
+    },
+    {
+      id: "roadmap_task_10",
+      title: "[개선] 업로드 파일 유효성 검사 및 단일 용량 제한 로직 추가",
+      description: "서버 스토리지 보호 및 악성 스크립트 차단을 위해 최대 업로드 용량을 50MB로 제한하고, 지정된 미디어 확장자(.mp3, .wav, .mp4)만 업로드를 수락합니다.",
+      status: "completed",
+      checked: true
+    }
+  ];
   
-  const tasks: Task[] = sampleTasks.map((t, i) => ({
+  const tasks: Task[] = sampleTasks.map(t => ({
     ...t,
-    id: `task_${i + 1}`,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }));

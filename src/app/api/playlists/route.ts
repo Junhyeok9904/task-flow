@@ -44,9 +44,21 @@ export async function POST(request: Request) {
     const playlists = getPlaylists();
     const idx = playlists.findIndex(p => p.id === body.id);
     if (idx === -1) return NextResponse.json({ error: 'Playlist not found' }, { status: 404 });
-    if (!playlists[idx].items.includes(body.itemPath)) {
+    
+    const isDuplicate = playlists[idx].items.includes(body.itemPath);
+    if (isDuplicate && !body.force && !body.strategy) {
+      return NextResponse.json({ duplicate: true, playlistId: body.id, itemPath: body.itemPath });
+    }
+    
+    if (body.strategy === 'replace') {
+      playlists[idx].items = playlists[idx].items.filter(p => p !== body.itemPath);
+    }
+    
+    // Add track (strategy = keep_both or replace or force)
+    if (body.strategy !== 'skip') {
       playlists[idx].items.push(body.itemPath);
     }
+    
     const fs = require('fs');
     const path = require('path');
     const PLAYLISTS_FILE = path.join(process.cwd(), 'data', 'playlists.json');
