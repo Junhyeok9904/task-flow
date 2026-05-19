@@ -42,7 +42,7 @@ export default function ProgressPage() {
   const [repeatMode, setRepeatMode] = useState<'none' | 'all' | 'one'>('none');
   const [isShuffle, setIsShuffle] = useState(false);
 
-  // ── 인라인 편집 상태 ──
+  // Inline editing states
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
@@ -71,10 +71,13 @@ export default function ProgressPage() {
   const playMedia = useCallback((item: any) => {
     if (!audioEl) return;
     const src = item.path || item.src || item.url || item.filePath;
-    // 상대경로면 현재 오리진 붙이기
     audioEl.src = src.startsWith('http') ? src : window.location.origin + src;
     audioEl.play().catch(() => {});
-    setPlayer(p => ({ ...p, current: { name: item.name || item.title || 'Unknown', src, type: item.type || 'audio' }, isPlaying: true }));
+    setPlayer(p => ({
+      ...p,
+      current: { name: item.name || item.title || 'Unknown Track', src, type: item.type || 'audio' },
+      isPlaying: true
+    }));
   }, [audioEl]);
 
   const handleNext = useCallback((autoEnded?: boolean) => {
@@ -129,10 +132,7 @@ export default function ProgressPage() {
     playMedia(prevSong);
   }, [audioEl, mediaList, player.current, repeatMode, isShuffle, playMedia]);
 
-  const toggleShuffle = () => {
-    setIsShuffle(prev => !prev);
-  };
-
+  const toggleShuffle = () => setIsShuffle(prev => !prev);
   const toggleRepeat = () => {
     setRepeatMode(prev => {
       if (prev === 'none') return 'all';
@@ -162,45 +162,48 @@ export default function ProgressPage() {
 
   const togglePlay = () => {
     if (!audioEl || !player.current) return;
-    if (player.isPlaying) { audioEl.pause(); }
-    else { audioEl.play().catch(() => {}); }
+    if (player.isPlaying) {
+      audioEl.pause();
+    } else {
+      audioEl.play().catch(() => {});
+    }
     setPlayer(p => ({ ...p, isPlaying: !p.isPlaying }));
   };
 
   const updateTask = async (id: string, updates: any) => {
     await fetch('/api/tasks', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'update', id, updates }),
     });
     await loadTasks();
   };
 
-  // ── 인라인 편집 시작 ──
   const startEdit = (task: any) => {
     setEditingId(task.id);
     setEditTitle(task.title);
     setEditDesc(task.description || '');
   };
 
-  // ── 인라인 편집 저장 ──
   const saveEdit = async () => {
     if (!editingId) return;
     await updateTask(editingId, {
-      title: editTitle.trim() || '제목 없음',
+      title: editTitle.trim() || 'Untitled Task',
       description: editDesc.trim(),
     });
     setEditingId(null);
   };
 
-  // ── 인라인 편집 취소 ──
   const cancelEdit = () => {
     setEditingId(null);
     setEditTitle('');
     setEditDesc('');
   };
 
-  const labelMap: Record<string, string> = { pending: '대기', in_progress: '진행중', completed: '완료' };
-  const colorMap: Record<string, string> = { pending: 'border-yellow-400', in_progress: 'border-blue-400', completed: 'border-green-400' };
+  const labelMap: Record<string, string> = { pending: '대기 (Pending)', in_progress: '진행중 (In Progress)', completed: '완료 (Completed)' };
+  const colorMap: Record<string, string> = { pending: 'border-amber-500', in_progress: 'border-blue-500', completed: 'border-emerald-500' };
+  const borderBgMap: Record<string, string> = { pending: 'border-l-4 border-l-amber-500', in_progress: 'border-l-4 border-l-blue-500', completed: 'border-l-4 border-l-emerald-500' };
+  
   const statusCounts = {
     pending: tasks.filter(t => t.status === 'pending').length,
     in_progress: tasks.filter(t => t.status === 'in_progress').length,
@@ -208,198 +211,272 @@ export default function ProgressPage() {
   };
   const completedPct = tasks.length ? Math.round(statusCounts.completed / tasks.length * 100) : 0;
 
-  if (loading) return <div className="flex h-screen items-center justify-center text-gray-500">로딩중...</div>;
+  if (loading) return <div className="flex h-screen items-center justify-center text-emerald-400 bg-[#08090d] font-sans">로딩중...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-800 pb-40">
-      <div className="max-w-7xl mx-auto space-y-6 p-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">📊 Dev Progress - 플레이리스트 제작 진척</h1>
-          <Link href="/" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">← 플레이리스트로</Link>
+    <div className="min-h-screen bg-[#0b0c10] text-[#cfd3db] font-sans pb-32 relative overflow-hidden select-none">
+      
+      {/* Dynamic Ambient Background Blur Circles */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none"></div>
+
+      <div className="max-w-7xl mx-auto space-y-6 p-6 relative z-10">
+        
+        {/* Top Header Section */}
+        <div className="flex items-center justify-between border-b border-gray-900 pb-5">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-bold text-white tracking-wide uppercase">📊 Dev Progress - 플레이리스트 제작 진척</h1>
+            <span className="text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold">
+              Subpage Active
+            </span>
+          </div>
+          <Link 
+            href="/" 
+            className="px-4 py-2 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl hover:from-emerald-500 hover:to-teal-400 hover:text-black font-bold text-xs transition duration-300 shadow-lg shadow-emerald-500/5"
+          >
+            ← 플레이리스트로 돌아가기
+          </Link>
         </div>
 
-        <div className="grid grid-cols-4 gap-4">
+        {/* 4-Column Translucent Stat Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { label: '전체', value: tasks.length, bg: 'bg-gray-100 text-gray-800' },
-            { label: '대기', value: statusCounts.pending, bg: 'bg-yellow-100 text-yellow-800' },
-            { label: '진행중', value: statusCounts.in_progress, bg: 'bg-blue-100 text-blue-800' },
-            { label: '완료', value: statusCounts.completed, bg: 'bg-green-100 text-green-800' },
+            { label: '전체 작업 (Total)', value: tasks.length, grad: 'from-blue-500 to-indigo-500', text: 'text-blue-400' },
+            { label: '대기 작업 (Pending)', value: statusCounts.pending, grad: 'from-amber-500 to-orange-500', text: 'text-amber-400' },
+            { label: '진행중 (In Progress)', value: statusCounts.in_progress, grad: 'from-cyan-500 to-blue-500', text: 'text-cyan-400' },
+            { label: '완료 작업 (Completed)', value: statusCounts.completed, grad: 'from-emerald-500 to-green-500', text: 'text-emerald-400' },
           ].map(s => (
-            <div key={s.label} className={`${s.bg} p-4 rounded-xl text-center`}>
-              <div className="text-3xl font-bold">{s.value}</div>
-              <div className="text-xs mt-1">{s.label}</div>
+            <div 
+              key={s.label} 
+              className="bg-[#13161f]/60 backdrop-blur-md border border-gray-800/80 p-5 rounded-2xl text-center shadow-xl hover:scale-[1.02] hover:bg-[#161a25]/85 hover:border-gray-700/80 transition-all duration-300"
+            >
+              <div className={`text-4xl font-extrabold bg-gradient-to-r ${s.grad} bg-clip-text text-transparent`}>
+                {s.value}
+              </div>
+              <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-2">{s.label}</div>
             </div>
           ))}
         </div>
 
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="font-bold mb-3">전체 완료율</h3>
-          <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all" style={{ width: `${completedPct}%` }} />
+        {/* Glowing Progress Percentage Bar */}
+        <div className="bg-[#13161f]/60 backdrop-blur-md border border-gray-800/80 p-5 rounded-2xl shadow-xl">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">전체 완료율 (Total Progress)</h3>
+            <span className="text-xs font-bold text-emerald-400">{completedPct}%</span>
           </div>
-          <p className="text-sm text-gray-600 mt-2">{statusCounts.completed} / {tasks.length} 완료 ({completedPct}%)</p>
+          <div className="h-4 bg-gray-950 rounded-full border border-gray-900 overflow-hidden relative shadow-inner">
+            <div 
+              className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-400 transition-all duration-500 shadow-[0_0_12px_rgba(16,185,129,0.3)]" 
+              style={{ width: `${completedPct}%` }} 
+            />
+          </div>
+          <p className="text-[10px] text-gray-500 mt-2.5 font-semibold">
+            {statusCounts.completed} / {tasks.length}개 작업 완료됨 ({completedPct}% 완료)
+          </p>
         </div>
 
-        {/* Kanban */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Kanban Board Row */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {(['pending', 'in_progress', 'completed'] as const).map(status => (
-            <div key={status} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className={`border-t-4 ${colorMap[status]} px-4 py-3 flex justify-between items-center`}>
-                <h3 className="font-bold">{labelMap[status]}</h3>
-                <span className="bg-gray-200 px-2 py-1 rounded text-xs">
+            <div key={status} className="bg-[#13161f]/60 backdrop-blur-md border border-gray-900 rounded-2xl overflow-hidden shadow-xl flex flex-col h-[65vh]">
+              {/* Kanban Column Header with glowing accent lines */}
+              <div className={`border-t-4 ${colorMap[status]} px-4 py-3 bg-[#0f1118]/80 flex justify-between items-center shrink-0`}>
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">{labelMap[status]}</h3>
+                <span className="bg-[#181b24] border border-gray-800 px-2 py-0.5 rounded text-[10px] font-mono text-gray-400">
                   {tasks.filter(t => t.status === status && t.checked).length} / {tasks.filter(t => t.status === status).length}
                 </span>
               </div>
-              <div className="p-3 space-y-2 max-h-[60vh] overflow-y-auto">
+              
+              {/* Column Item list */}
+              <div className="p-3 space-y-2.5 overflow-y-auto flex-1 bg-[#13161f]/20">
                 {tasks.filter(t => t.status === status).map(task => (
-                  <div key={task.id} className={`p-3 bg-gray-50 rounded-lg border-l-4 ${colorMap[status].replace('border', 'border-l')} ${task.checked ? 'opacity-60' : ''}`}>
-
-                    {/* ── 인라인 편집 모드 ── */}
+                  <div 
+                    key={task.id} 
+                    className={`p-4 bg-[#181b24]/75 rounded-xl border border-gray-900/60 ${borderBgMap[status]} transition-all duration-300 hover:bg-[#1c1e29] ${task.checked ? 'opacity-50' : ''}`}
+                  >
+                    {/* Inline Editor */}
                     {editingId === task.id ? (
-                      <div className="space-y-2">
+                      <div className="space-y-3.5">
                         <input
                           type="text"
                           value={editTitle}
                           onChange={e => setEditTitle(e.target.value)}
-                          placeholder="작업 제목"
-                          className="w-full px-2 py-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          placeholder="작업 제목 입력..."
+                          className="w-full bg-[#12131a] border border-gray-800 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                           autoFocus
                         />
                         <textarea
                           value={editDesc}
                           onChange={e => setEditDesc(e.target.value)}
-                          placeholder="작업 설명"
+                          placeholder="작업 설명 입력..."
                           rows={2}
-                          className="w-full px-2 py-1 border border-blue-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+                          className="w-full bg-[#12131a] border border-gray-800 rounded px-2.5 py-1.5 text-[11px] text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
                         />
-                        <div className="flex gap-1">
-                          <button onClick={saveEdit}
-                            className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
+                        <div className="flex gap-1.5">
+                          <button onClick={saveEdit} className="text-[10px] px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded transition">
                             💾 저장
                           </button>
-                          <button onClick={cancelEdit}
-                            className="text-xs px-3 py-1 bg-gray-300 rounded hover:bg-gray-400">
+                          <button onClick={cancelEdit} className="text-[10px] px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 rounded transition">
                             ✕ 취소
                           </button>
                         </div>
                       </div>
                     ) : (
-                      /* ── 일반 표시 모드 ── */
+                      /* Display elements */
                       <>
-                        {/* 제목 줄: 체크 + 클릭편집 + 상태전환 */}
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => updateTask(task.id, { checked: !task.checked })}
-                            className="text-base">
-                            {task.checked ? '✅' : '⬜'}
+                        {/* Title Row */}
+                        <div className="flex items-center gap-2.5">
+                          <button 
+                            onClick={() => updateTask(task.id, { checked: !task.checked })}
+                            className="text-gray-500 hover:text-emerald-400 transition"
+                          >
+                            {task.checked ? '🟢' : '⚪'}
                           </button>
-                          <button onClick={() => startEdit(task)}
-                            className={`flex-1 text-left text-sm hover:text-blue-600 transition ${task.checked ? 'line-through text-gray-400' : ''}`}>
-                            {task.title} ✏️
+                          <button 
+                            onClick={() => startEdit(task)}
+                            className={`flex-1 text-left text-xs font-bold hover:text-blue-400 transition text-white ${task.checked ? 'line-through text-gray-500' : ''}`}
+                          >
+                            {task.title} <span className="text-[9px] text-gray-600 opacity-0 hover:opacity-100 transition pl-1">✏️</span>
                           </button>
                         </div>
-                        {/* 설명 줄: 클릭편집 */}
+                        
+                        {/* Description */}
                         {task.description && (
-                          <button onClick={() => startEdit(task)}
-                            className="block w-full text-left text-xs text-gray-500 hover:text-blue-500 truncate mt-1 ml-6">
+                          <button 
+                            onClick={() => startEdit(task)}
+                            className="block w-full text-left text-[10px] text-gray-500 hover:text-blue-400 truncate mt-1.5 pl-6"
+                          >
                             📝 {task.description}
                           </button>
                         )}
-                        {/* 상태 이동 버튼 */}
-                        <div className="flex gap-1 mt-2 ml-6 flex-wrap">
-                          {status !== 'pending' && <button onClick={() => updateTask(task.id, { status: 'pending' })} className="text-xs px-2 py-1 bg-yellow-100 rounded hover:bg-yellow-200">← 대기</button>}
-                          {status !== 'in_progress' && <button onClick={() => updateTask(task.id, { status: 'in_progress' })} className="text-xs px-2 py-1 bg-blue-100 rounded hover:bg-blue-200">→ 진행</button>}
-                          {status !== 'completed' && <button onClick={() => updateTask(task.id, { checked: true, status: 'completed' })} className="text-xs px-2 py-1 bg-green-100 rounded hover:bg-green-200">✓ 완료</button>}
+                        
+                        {/* Kanban Actions */}
+                        <div className="flex gap-1 mt-3 pl-6 flex-wrap">
+                          {status !== 'pending' && (
+                            <button onClick={() => updateTask(task.id, { status: 'pending' })} className="text-[8px] font-bold px-2 py-1 bg-gray-900 border border-gray-850 hover:bg-[#1b2520] hover:text-amber-400 text-gray-400 rounded-md transition uppercase">
+                              ← 대기
+                            </button>
+                          )}
+                          {status !== 'in_progress' && (
+                            <button onClick={() => updateTask(task.id, { status: 'in_progress' })} className="text-[8px] font-bold px-2 py-1 bg-gray-900 border border-gray-850 hover:bg-[#1b2520] hover:text-blue-400 text-gray-400 rounded-md transition uppercase">
+                              → 진행
+                            </button>
+                          )}
+                          {status !== 'completed' && (
+                            <button onClick={() => updateTask(task.id, { checked: true, status: 'completed' })} className="text-[8px] font-bold px-2 py-1 bg-gray-900 border border-gray-850 hover:bg-[#1b2520] hover:text-emerald-400 text-gray-400 rounded-md transition uppercase">
+                              ✓ 완료
+                            </button>
+                          )}
                         </div>
                       </>
                     )}
                   </div>
                 ))}
-                {!tasks.filter(t => t.status === status).length && <p className="text-center py-4 text-gray-400 text-sm">항목 없음</p>}
+                {!tasks.filter(t => t.status === status).length && (
+                  <p className="text-center py-8 text-gray-600 text-xs font-semibold">이 컬럼에 등록된 작업이 없습니다.</p>
+                )}
               </div>
             </div>
           ))}
         </div>
 
-        {/* 음악 플레이어 */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-          <h3 className="font-bold mb-3">🎵 음악 플레이어</h3>
+        {/* Music Player widget sync with Dark-Glass HUD */}
+        <div className="bg-[#13161f]/60 backdrop-blur-md border border-gray-800/80 rounded-2xl p-5 shadow-xl">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3.5">🎵 오디오 라이브러리 (Audio Library)</h3>
           {mediaList.length === 0 ? (
-            <p className="text-sm text-gray-400">미디어 파일이 없습니다.</p>
+            <p className="text-xs text-gray-500">업로드된 파일이 없습니다.</p>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {mediaList.map((m, idx) => (
-                <button key={m.id ?? m.filename ?? `media-${idx}`} onClick={() => playMedia(m)}
-                  className={`p-3 rounded-lg border text-left text-sm transition ${player.current?.id === m.id ? 'bg-blue-600 text-white border-blue-700' : 'bg-gray-50 hover:bg-blue-50 border-gray-200'}`}>
-                  <div className="truncate font-medium">▶ {m.name || m.filename || '파일'}</div>
-                </button>
-              ))}
+              {mediaList.map((m, idx) => {
+                const isActive = player.current?.src === m.path || player.current?.src === m.src;
+                return (
+                  <button 
+                    key={m.id ?? m.filename ?? `media-${idx}`} 
+                    onClick={() => playMedia(m)}
+                    className={`p-3 rounded-xl border text-left text-xs transition duration-300 flex items-center justify-between ${isActive ? 'bg-[#1b2f28] text-emerald-400 border-emerald-500/40 shadow-lg shadow-emerald-500/5' : 'bg-[#181b24]/80 hover:bg-[#1c1e29] border-gray-900 text-gray-300'}`}
+                  >
+                    <span className="truncate font-semibold max-w-[180px]">▶ {m.name || m.filename || 'Audio'}</span>
+                    <span className="text-[9px] text-gray-500 uppercase tracking-widest font-bold">MP3</span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
       </div>
 
-      {/* 하단 플레이바 */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gray-900 text-white px-6 py-3 flex items-center gap-4 shadow-2xl z-50">
-        <div className="w-48 truncate text-sm">
-          {player.current ? (
-            <span className="text-gray-300">🎵 {player.current.name}</span>
-          ) : (
-            <span className="text-gray-500">선택된 곡 없음</span>
-          )}
-        </div>
-        <div className="flex flex-col items-center flex-1 gap-1">
-          {/* 컨트롤 (재생/일시정지, 이전, 다음, 셔플, 반복) */}
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={toggleShuffle} 
-              className={`text-base transition-colors ${isShuffle ? 'text-blue-400 hover:text-blue-300' : 'text-gray-500 hover:text-gray-400'}`}
-              title="Shuffle"
-              disabled={!player.current}
-            >
-              🔀
-            </button>
-            <button onClick={handlePrev} className="text-xl hover:text-blue-400 text-gray-400" disabled={!player.current}>⏮</button>
-            <button onClick={togglePlay} className="text-2xl hover:text-blue-400 text-white disabled:text-gray-600" disabled={!player.current}>
-              {player.isPlaying ? '⏸' : '▶'}
-            </button>
-            <button onClick={() => handleNext(false)} className="text-xl hover:text-blue-400 text-gray-400" disabled={!player.current}>⏭</button>
-            <button 
-              onClick={toggleRepeat} 
-              className={`text-base transition-colors ${repeatMode !== 'none' ? 'text-blue-400 hover:text-blue-300' : 'text-gray-500 hover:text-gray-400'}`}
-              title={repeatMode === 'one' ? 'Repeat One' : repeatMode === 'all' ? 'Repeat All' : 'Repeat Off'}
-              disabled={!player.current}
-            >
-              {repeatMode === 'one' ? '🔂' : '🔁'}
-            </button>
+      {/* ─── Persistent Glassmorphic Player bar ─── */}
+      {player.current && (
+        <div className="fixed bottom-0 left-0 right-0 h-16 bg-[#0f1118] border-t border-gray-900 flex items-center justify-between px-6 z-50 select-none shadow-2xl">
+          {/* Left details */}
+          <div className="w-52 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500 to-indigo-500 flex items-center justify-center shrink-0 shadow">
+              <span className="text-lg text-white">💿</span>
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-white truncate w-36" title={player.current.name}>{player.current.name}</p>
+              <span className="text-[9px] text-gray-500 uppercase tracking-wider font-mono">playing progress</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="font-mono w-10 text-right">{fmt(player.currentTime)}</span>
-            <button onClick={() => seekBy(-SKIP)} className="px-2 py-1 bg-gray-700 rounded hover:bg-gray-600 text-xs">-{SKIP}</button>
-            <input
-              type="range"
-              min="0"
-              max={player.duration || 0}
-              value={player.currentTime}
-              onChange={e => {
-                const val = parseFloat(e.target.value);
-                if (audioEl) {
-                  audioEl.currentTime = val;
-                  setPlayer(p => ({ ...p, currentTime: val }));
-                }
-              }}
-              className="w-48 h-1.5 accent-blue-500 bg-gray-700 rounded-full appearance-none cursor-pointer"
-            />
-            <button onClick={() => seekBy(SKIP)} className="px-2 py-1 bg-gray-700 rounded hover:bg-gray-600 text-xs">+{SKIP}</button>
-            <span className="font-mono w-10">{fmt(player.duration)}</span>
+
+          {/* Center controllers */}
+          <div className="flex flex-col items-center flex-1 max-w-xl gap-1">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={toggleShuffle}
+                className={`text-xs transition ${isShuffle ? 'text-emerald-400' : 'text-gray-500 hover:text-gray-400'}`}
+                title="Shuffle"
+              >
+                🔀
+              </button>
+              <button onClick={handlePrev} className="text-sm text-gray-400 hover:text-white transition">⏮</button>
+              <button onClick={togglePlay} className="w-8 h-8 bg-white text-gray-900 rounded-full flex items-center justify-center hover:scale-105 transition shadow">
+                {player.isPlaying ? '⏸' : '▶'}
+              </button>
+              <button onClick={() => handleNext(false)} className="text-sm text-gray-400 hover:text-white transition">⏭</button>
+              <button
+                onClick={toggleRepeat}
+                className={`text-xs transition ${repeatMode !== 'none' ? 'text-emerald-400' : 'text-gray-500 hover:text-gray-400'}`}
+                title={repeatMode === 'one' ? 'Repeat One' : repeatMode === 'all' ? 'Repeat All' : 'Repeat Off'}
+              >
+                {repeatMode === 'one' ? '🔂' : '🔁'}
+              </button>
+            </div>
+
+            {/* Range Progress */}
+            <div className="w-full flex items-center gap-2.5 text-[9px] text-gray-500 font-mono">
+              <span className="w-8 text-right">{fmt(player.currentTime)}</span>
+              <button onClick={() => seekBy(-SKIP)} className="px-1.5 py-0.5 bg-[#12131a] rounded border border-gray-800 hover:bg-[#181b24] transition text-[8px] font-bold">-{SKIP}</button>
+              <input
+                type="range"
+                min="0"
+                max={player.duration || 0}
+                value={player.currentTime}
+                onChange={e => {
+                  const val = parseFloat(e.target.value);
+                  if (audioEl) {
+                    audioEl.currentTime = val;
+                    setPlayer(p => ({ ...p, currentTime: val }));
+                  }
+                }}
+                className="flex-1 h-1 bg-gray-800 rounded-full appearance-none accent-emerald-500 cursor-pointer"
+              />
+              <button onClick={() => seekBy(SKIP)} className="px-1.5 py-0.5 bg-[#12131a] rounded border border-gray-800 hover:bg-[#181b24] transition text-[8px] font-bold">+{SKIP}</button>
+              <span className="w-8">{fmt(player.duration)}</span>
+            </div>
+          </div>
+
+          {/* Right Volume Controls */}
+          <div className="w-56 flex items-center justify-end gap-4 shrink-0">
+            <span className="text-[9px] text-gray-500 font-mono">Synced Player</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs">{volume > 0 ? '🔊' : '🔇'}</span>
+              <input type="range" min="0" max="1" step="0.05" value={volume} onChange={e => setVolume(parseFloat(e.target.value))} className="w-16 h-1 accent-emerald-500 bg-gray-800" />
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 w-36">
-          <span className="text-sm">{volume > 0 ? '🔊' : '🔇'}</span>
-          <input type="range" min="0" max="1" step="0.05" value={volume}
-            onChange={e => setVolume(parseFloat(e.target.value))}
-            className="w-full h-1.5 accent-blue-500" />
-        </div>
-      </div>
+      )}
+
     </div>
   );
 }
