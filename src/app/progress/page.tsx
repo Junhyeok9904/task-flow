@@ -1,14 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-
-interface PlayerState {
-  current: { name: string; src: string; type: string; id?: string } | null;
-  isPlaying: boolean;
-  currentTime: number;
-  duration: number;
-}
+import { useAudioPlayer } from '../../contexts/AudioProvider';
+import { MediaFile } from '../../types';
 
 function fmt(s: number) {
   if (!isFinite(s) || isNaN(s)) return '00:00';
@@ -21,26 +16,30 @@ export default function ProgressPage() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [player, setPlayer] = useState<PlayerState>({
-    current: null,
-    isPlaying: false,
-    currentTime: 0,
-    duration: 0,
-  });
-  const [audioEl] = useState(() => typeof Audio !== 'undefined' ? new Audio() : null);
+  const {
+    currentFile,
+    isPlaying,
+    currentTime,
+    duration,
+    volume,
+    setVolume,
+    queue,
+    queueIndex,
+    repeatMode,
+    isShuffle,
+    playFile,
+    togglePlay,
+    seekBy,
+    seekTo,
+    handleNext,
+    handlePrev,
+    toggleShuffle,
+    toggleRepeat,
+    playPlaylistRewrite
+  } = useAudioPlayer();
 
   const SKIP = 10;
-  const seekBy = (delta: number) => {
-    if (!audioEl) return;
-    const dur = audioEl.duration;
-    if (!isFinite(dur) || dur === 0) return;
-    audioEl.currentTime = Math.max(0, Math.min(dur, audioEl.currentTime + delta));
-  };
-
-  const [mediaList, setMediaList] = useState<any[]>([]);
-  const [volume, setVolume] = useState(0.8);
-  const [repeatMode, setRepeatMode] = useState<'none' | 'all' | 'one'>('none');
-  const [isShuffle, setIsShuffle] = useState(false);
+  const [mediaList, setMediaList] = useState<MediaFile[]>([]);
 
   // Inline editing states
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -68,107 +67,14 @@ export default function ProgressPage() {
     loadMedia();
   }, []);
 
-  const playMedia = useCallback((item: any) => {
-    if (!audioEl) return;
-    const src = item.path || item.src || item.url || item.filePath;
-    audioEl.src = src.startsWith('http') ? src : window.location.origin + src;
-    audioEl.play().catch(() => {});
-    setPlayer(p => ({
-      ...p,
-      current: { name: item.name || item.title || 'Unknown Track', src, type: item.type || 'audio' },
-      isPlaying: true
-    }));
-  }, [audioEl]);
-
-  const handleNext = useCallback((autoEnded?: boolean) => {
-    if (!audioEl || !mediaList.length) return;
-    if (autoEnded && repeatMode === 'one') {
-      audioEl.currentTime = 0;
-      audioEl.play().catch(() => {});
-      setPlayer(p => ({ ...p, isPlaying: true }));
-      return;
-    }
-
-    let nextIdx = 0;
-    if (player.current) {
-      const curIdx = mediaList.findIndex(m => m.path === player.current?.src || m.src === player.current?.src);
-      if (curIdx !== -1) {
-        if (isShuffle) {
-          nextIdx = Math.floor(Math.random() * mediaList.length);
-        } else {
-          nextIdx = curIdx + 1;
-          if (nextIdx >= mediaList.length) {
-            if (repeatMode === 'all') {
-              nextIdx = 0;
-            } else {
-              setPlayer(p => ({ ...p, isPlaying: false, currentTime: 0 }));
-              return;
-            }
-          }
-        }
-      }
-    }
-    const nextSong = mediaList[nextIdx];
-    playMedia(nextSong);
-  }, [audioEl, mediaList, player.current, repeatMode, isShuffle, playMedia]);
-
-  const handlePrev = useCallback(() => {
-    if (!audioEl || !mediaList.length) return;
-    let prevIdx = 0;
-    if (player.current) {
-      const curIdx = mediaList.findIndex(m => m.path === player.current?.src || m.src === player.current?.src);
-      if (curIdx !== -1) {
-        if (isShuffle) {
-          prevIdx = Math.floor(Math.random() * mediaList.length);
-        } else {
-          prevIdx = curIdx - 1;
-          if (prevIdx < 0) {
-            prevIdx = repeatMode === 'all' ? mediaList.length - 1 : 0;
-          }
-        }
-      }
-    }
-    const prevSong = mediaList[prevIdx];
-    playMedia(prevSong);
-  }, [audioEl, mediaList, player.current, repeatMode, isShuffle, playMedia]);
-
-  const toggleShuffle = () => setIsShuffle(prev => !prev);
-  const toggleRepeat = () => {
-    setRepeatMode(prev => {
-      if (prev === 'none') return 'all';
-      if (prev === 'all') return 'one';
-      return 'none';
-    });
-  };
-
-  useEffect(() => {
-    if (!audioEl) return;
-    const tick = () => setPlayer(p => ({ ...p, currentTime: audioEl.currentTime }));
-    const onMeta = () => setPlayer(p => ({ ...p, duration: audioEl.duration }));
-    const onEnded = () => { handleNext(true); };
-    audioEl.addEventListener('timeupdate', tick);
-    audioEl.addEventListener('loadedmetadata', onMeta);
-    audioEl.addEventListener('ended', onEnded);
-    return () => {
-      audioEl.removeEventListener('timeupdate', tick);
-      audioEl.removeEventListener('loadedmetadata', onMeta);
-      audioEl.removeEventListener('ended', onEnded);
-    };
-  }, [audioEl, handleNext]);
-
-  useEffect(() => {
-    if (audioEl) audioEl.volume = volume;
-  }, [volume, audioEl]);
-
-  const togglePlay = () => {
-    if (!audioEl || !player.current) return;
-    if (player.isPlaying) {
-      audioEl.pause();
+  const playMedia = useCallback((item: MediaFile) => {
+    if (queue.length === 0 || !queue.some(q => q.path === item.path)) {
+      playPlaylistRewrite(mediaList);
+      setTimeout(() => playFile(item), 50);
     } else {
-      audioEl.play().catch(() => {});
+      playFile(item);
     }
-    setPlayer(p => ({ ...p, isPlaying: !p.isPlaying }));
-  };
+  }, [mediaList, playPlaylistRewrite, playFile, queue]);
 
   const updateTask = async (id: string, updates: any) => {
     await fetch('/api/tasks', {
@@ -230,12 +136,26 @@ export default function ProgressPage() {
               Subpage Active
             </span>
           </div>
-          <Link 
-            href="/" 
-            className="px-4 py-2 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl hover:from-emerald-500 hover:to-teal-400 hover:text-black font-bold text-xs transition duration-300 shadow-lg shadow-emerald-500/5"
-          >
-            ← 플레이리스트로 돌아가기
-          </Link>
+          <div className="flex gap-3">
+            <Link 
+              href="/checklist" 
+              className="px-4 py-2 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-400 border border-blue-500/30 rounded-xl hover:from-blue-500 hover:to-cyan-400 hover:text-white font-bold text-xs transition duration-300 shadow-lg shadow-blue-500/5"
+            >
+              ✓ 데일리 체크리스트
+            </Link>
+            <Link 
+              href="/board" 
+              className="px-4 py-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-400 border border-purple-500/30 rounded-xl hover:from-purple-500 hover:to-pink-400 hover:text-white font-bold text-xs transition duration-300 shadow-lg shadow-purple-500/5"
+            >
+              🚀 인터랙티브 보드로 이동
+            </Link>
+            <Link 
+              href="/" 
+              className="px-4 py-2 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl hover:from-emerald-500 hover:to-teal-400 hover:text-black font-bold text-xs transition duration-300 shadow-lg shadow-emerald-500/5"
+            >
+              ← 플레이리스트로 돌아가기
+            </Link>
+          </div>
         </div>
 
         {/* 4-Column Translucent Stat Grid */}
@@ -388,14 +308,14 @@ export default function ProgressPage() {
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {mediaList.map((m, idx) => {
-                const isActive = player.current?.src === m.path || player.current?.src === m.src;
+                const isActive = currentFile?.path === m.path;
                 return (
                   <button 
-                    key={m.id ?? m.filename ?? `media-${idx}`} 
+                    key={m.id ?? m.name ?? `media-${idx}`} 
                     onClick={() => playMedia(m)}
                     className={`p-3 rounded-xl border text-left text-xs transition duration-300 flex items-center justify-between ${isActive ? 'bg-[#1b2f28] text-emerald-400 border-emerald-500/40 shadow-lg shadow-emerald-500/5' : 'bg-[#181b24]/80 hover:bg-[#1c1e29] border-gray-900 text-gray-300'}`}
                   >
-                    <span className="truncate font-semibold max-w-[180px]">▶ {m.name || m.filename || 'Audio'}</span>
+                    <span className="truncate font-semibold max-w-[180px]">▶ {m.name || 'Audio'}</span>
                     <span className="text-[9px] text-gray-500 uppercase tracking-widest font-bold">MP3</span>
                   </button>
                 );
@@ -406,7 +326,7 @@ export default function ProgressPage() {
       </div>
 
       {/* ─── Persistent Glassmorphic Player bar ─── */}
-      {player.current && (
+      {currentFile && (
         <div className="fixed bottom-0 left-0 right-0 h-16 bg-[#0f1118] border-t border-gray-900 flex items-center justify-between px-6 z-50 select-none shadow-2xl">
           {/* Left details */}
           <div className="w-52 flex items-center gap-3">
@@ -414,7 +334,7 @@ export default function ProgressPage() {
               <span className="text-lg text-white">💿</span>
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-white truncate w-36" title={player.current.name}>{player.current.name}</p>
+              <p className="text-xs font-semibold text-white truncate w-36" title={currentFile.name}>{currentFile.name}</p>
               <span className="text-[9px] text-gray-500 uppercase tracking-wider font-mono">playing progress</span>
             </div>
           </div>
@@ -431,7 +351,7 @@ export default function ProgressPage() {
               </button>
               <button onClick={handlePrev} className="text-sm text-gray-400 hover:text-white transition">⏮</button>
               <button onClick={togglePlay} className="w-8 h-8 bg-white text-gray-900 rounded-full flex items-center justify-center hover:scale-105 transition shadow">
-                {player.isPlaying ? '⏸' : '▶'}
+                {isPlaying ? '⏸' : '▶'}
               </button>
               <button onClick={() => handleNext(false)} className="text-sm text-gray-400 hover:text-white transition">⏭</button>
               <button
@@ -445,24 +365,21 @@ export default function ProgressPage() {
 
             {/* Range Progress */}
             <div className="w-full flex items-center gap-2.5 text-[9px] text-gray-500 font-mono">
-              <span className="w-8 text-right">{fmt(player.currentTime)}</span>
+              <span className="w-8 text-right">{fmt(currentTime)}</span>
               <button onClick={() => seekBy(-SKIP)} className="px-1.5 py-0.5 bg-[#12131a] rounded border border-gray-800 hover:bg-[#181b24] transition text-[8px] font-bold">-{SKIP}</button>
               <input
                 type="range"
                 min="0"
-                max={player.duration || 0}
-                value={player.currentTime}
+                max={duration || 0}
+                value={currentTime}
                 onChange={e => {
                   const val = parseFloat(e.target.value);
-                  if (audioEl) {
-                    audioEl.currentTime = val;
-                    setPlayer(p => ({ ...p, currentTime: val }));
-                  }
+                  seekTo(val);
                 }}
                 className="flex-1 h-1 bg-gray-800 rounded-full appearance-none accent-emerald-500 cursor-pointer"
               />
               <button onClick={() => seekBy(SKIP)} className="px-1.5 py-0.5 bg-[#12131a] rounded border border-gray-800 hover:bg-[#181b24] transition text-[8px] font-bold">+{SKIP}</button>
-              <span className="w-8">{fmt(player.duration)}</span>
+              <span className="w-8">{fmt(duration)}</span>
             </div>
           </div>
 

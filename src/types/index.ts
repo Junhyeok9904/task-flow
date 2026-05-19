@@ -17,6 +17,8 @@ export interface MediaFile {
   path: string;
   size: number;
   addedAt: string;
+  artist?: string;
+  coverArt?: string;
 }
 
 export interface Playlist {

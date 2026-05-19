@@ -18,6 +18,7 @@ export const metadata: Metadata = {
 };
 
 import { UploadProvider } from "../components/UploadManager";
+import { AudioProvider } from "../contexts/AudioProvider";
 
 export default function RootLayout({
   children,
@@ -31,7 +32,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <UploadProvider>
-          {children}
+          <AudioProvider>
+            {children}
+          </AudioProvider>
         </UploadProvider>
       </body>
     </html>

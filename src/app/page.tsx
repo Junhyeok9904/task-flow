@@ -5,7 +5,7 @@ import { MediaFile, Playlist } from '../types';
 import Link from 'next/link';
 import { useUpload } from '../components/UploadManager';
 import { Icon } from '../components/ui/Icon';
-import { useAudioPlayer } from '../hooks/useAudioPlayer';
+import { useAudioPlayer } from '../contexts/AudioProvider';
 
 function fmtTime(s: number) {
   if (!isFinite(s) || isNaN(s)) return '00:00';
@@ -57,7 +57,7 @@ export default function Home() {
   const {
     currentFile, setCurrentFile, isPlaying, setIsPlaying, currentTime, setCurrentTime,
     duration, setDuration, volume, setVolume, queue, setQueue, queueIndex, setQueueIndex,
-    repeatMode, setRepeatMode, isShuffle, setIsShuffle, audioRef, videoRef, getMediaEl,
+    repeatMode, setRepeatMode, isShuffle, setIsShuffle, getMediaEl,
     playPlaylistRewrite, playPlaylistAppend, handlePrev, handleNext, playFile, togglePlay,
     seekBy, toggleShuffle, toggleRepeat
   } = useAudioPlayer();
@@ -594,11 +594,15 @@ export default function Home() {
                           {/* Top part: Cover thumbnail, Title, artist, ellipsis */}
                           <div className="flex gap-3 items-center">
                             <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${getGradientFromTitle(f.name)} flex items-center justify-center shadow-md relative overflow-hidden shrink-0`}>
-                              <span className="text-lg text-white drop-shadow-md">{f.type === 'video' ? '🎬' : '🎵'}</span>
+                              {f.coverArt ? (
+                                <img src={f.coverArt} alt="Cover" className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="text-lg text-white drop-shadow-md">{f.type === 'video' ? '🎬' : '🎵'}</span>
+                              )}
                             </div>
                             <div className="min-w-0 flex-1">
                               <h3 className="font-bold text-xs text-white truncate pr-4" title={f.name}>{f.name}</h3>
-                              <span className="text-[10px] text-gray-500">Stargazer</span>
+                              <span className="text-[10px] text-gray-500 truncate block w-full">{f.artist || 'Unknown Artist'}</span>
                             </div>
                             <button className="text-gray-600 hover:text-gray-300 text-xs self-start mt-1">︙</button>
                           </div>
@@ -792,20 +796,22 @@ export default function Home() {
                 
                 {/* Glowing vinyl/glowing city cover visualizer */}
                 <div className={`aspect-square w-full rounded-2xl bg-gradient-to-br ${getGradientFromTitle(selectedTrack.name)} flex flex-col items-center justify-center shadow-xl relative overflow-hidden border border-white/5 group`}>
-                  
-                  {/* Glowing Laser Grid City Mock Cover */}
-                  <div className="absolute inset-0 bg-cover bg-center flex flex-col items-center justify-end p-4 bg-black/20">
-                    <div className="w-20 h-20 rounded-full border-4 border-black/40 bg-gray-900/90 flex items-center justify-center shadow-lg relative animate-spin [animation-duration:20s] shrink-0">
-                      <div className="w-6 h-6 rounded-full bg-black/60 flex items-center justify-center">
-                        <span className="text-white text-xs">💿</span>
+                  {selectedTrack.coverArt ? (
+                    <img src={selectedTrack.coverArt} alt="Cover" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="absolute inset-0 bg-cover bg-center flex flex-col items-center justify-end p-4 bg-black/20">
+                      <div className="w-20 h-20 rounded-full border-4 border-black/40 bg-gray-900/90 flex items-center justify-center shadow-lg relative animate-spin [animation-duration:20s] shrink-0">
+                        <div className="w-6 h-6 rounded-full bg-black/60 flex items-center justify-center">
+                          <span className="text-white text-xs">💿</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="space-y-1">
                   <h2 className="font-bold text-base text-white tracking-wide line-clamp-2" title={selectedTrack.name}>{selectedTrack.name}</h2>
-                  <span className="text-[10px] text-emerald-400 uppercase tracking-widest font-bold font-mono">Stargazer</span>
+                  <span className="text-[10px] text-emerald-400 uppercase tracking-widest font-bold font-mono">{selectedTrack.artist || 'Unknown Artist'}</span>
                 </div>
               </div>
 
@@ -893,20 +899,19 @@ export default function Home() {
       {/* ─── Bottom Persistent Media Player Bar ─── */}
       {currentFile && (
         <>
-          {currentFile.type === 'video'
-            ? <video ref={videoRef} src={currentFile.path} autoPlay className="hidden" />
-            : <audio ref={audioRef} src={currentFile.path} autoPlay className="hidden" />
-          }
-          
           <div className="h-16 bg-[#0f1118] border-t border-gray-900 flex items-center justify-between px-6 z-50 shrink-0 select-none">
             {/* Left track details */}
             <div className="w-52 flex items-center gap-3">
-              <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${getGradientFromTitle(currentFile.name)} flex items-center justify-center shrink-0 shadow`}>
-                <span className="text-lg text-white">💿</span>
+              <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${getGradientFromTitle(currentFile.name)} flex items-center justify-center shrink-0 shadow overflow-hidden`}>
+                {currentFile.coverArt ? (
+                  <img src={currentFile.coverArt} alt="Cover" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-lg text-white">💿</span>
+                )}
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-white truncate w-36" title={currentFile.name}>{currentFile.name}</p>
-                <span className="text-[9px] text-gray-500 uppercase tracking-wider font-mono">playing</span>
+                <span className="text-[9px] text-gray-500 uppercase tracking-wider font-mono truncate w-36 block">{currentFile.artist || 'playing'}</span>
               </div>
             </div>
 
