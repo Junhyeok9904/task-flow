@@ -87,10 +87,10 @@ export default function BoardPage() {
   if (loading) return <div className="flex h-screen items-center justify-center text-emerald-400 bg-[#08090d] font-sans">로딩중...</div>;
 
   return (
-    <div className="min-h-screen bg-[#0b0c10] text-[#cfd3db] font-sans pb-32 relative overflow-hidden select-none">
+    <div className="min-h-screen bg-transparent text-[#cfd3db] font-sans pb-32 relative overflow-hidden select-none">
       {/* Dynamic Ambient Background Blur Circles */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[120px] pointer-events-none"></div>
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[150px] pointer-events-none"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-[150px] pointer-events-none"></div>
 
       <div className="max-w-7xl mx-auto space-y-6 p-6 relative z-10">
         
@@ -122,52 +122,55 @@ export default function BoardPage() {
               onDragOver={(e) => handleDragOver(e, status)}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, status)}
-              className={`bg-[#13161f]/60 backdrop-blur-md border rounded-2xl overflow-hidden shadow-xl flex flex-col transition-all duration-300 ${
+              className={`bg-black/40 backdrop-blur-3xl border rounded-3xl overflow-hidden shadow-[0_4px_30px_rgba(0,0,0,0.3)] flex flex-col transition-all duration-300 ${
                 dragOverColumn === status 
-                  ? 'border-emerald-500/50 shadow-emerald-500/20 bg-[#161a25]/80 scale-[1.01]' 
-                  : 'border-gray-900'
+                  ? 'border-emerald-500/60 shadow-[0_0_20px_rgba(16,185,129,0.2)] bg-black/60 scale-[1.01]' 
+                  : 'border-white/5 hover:border-white/10'
               }`}
             >
               {/* Kanban Column Header */}
-              <div className={`border-t-4 ${colorMap[status]} px-4 py-3 bg-[#0f1118]/80 flex justify-between items-center shrink-0`}>
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider">{labelMap[status]}</h3>
-                <span className="bg-[#181b24] border border-gray-800 px-2 py-0.5 rounded text-[10px] font-mono text-gray-400">
-                  {tasks.filter(t => t.status === status).length}
-                </span>
+              <div className={`px-6 py-4 flex justify-between items-center shrink-0 border-b border-white/5`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-3 h-3 rounded-full ${status === 'completed' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]' : status === 'in_progress' ? 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)]' : 'bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.8)]'}`}></div>
+                  <h3 className="text-sm font-bold text-white tracking-wide">{labelMap[status]}</h3>
+                </div>
+                <span className="text-[10px] text-gray-500 font-semibold">{tasks.filter(t => t.status === status).length} Tasks</span>
               </div>
               
               {/* Column Item list */}
-              <div className="p-3 space-y-3 overflow-y-auto flex-1 bg-[#13161f]/20">
+              <div className="p-4 space-y-4 overflow-y-auto flex-1 bg-transparent">
                 {tasks.filter(t => t.status === status).map(task => (
                   <div 
                     key={task.id} 
                     draggable
                     onDragStart={(e) => handleDragStart(e, task.id)}
                     onDragEnd={handleDragEnd}
-                    className={`p-4 bg-[#181b24]/90 rounded-xl border border-gray-800/80 ${borderBgMap[status]} transition-all duration-300 cursor-grab active:cursor-grabbing hover:bg-[#1c1e29] hover:border-gray-700 shadow-md ${draggedTaskId === task.id ? 'opacity-50 scale-95' : 'opacity-100'} ${task.checked ? 'opacity-70' : ''}`}
+                    className={`p-5 bg-white/5 backdrop-blur-xl rounded-2xl border transition-all duration-300 cursor-grab active:cursor-grabbing hover:bg-white/10 shadow-lg 
+                      ${status === 'completed' ? 'border-emerald-500/30 hover:border-emerald-500/60' : status === 'in_progress' ? 'border-blue-500/30 hover:border-blue-500/60' : 'border-purple-500/30 hover:border-purple-500/60'} 
+                      ${draggedTaskId === task.id ? 'opacity-50 scale-95' : 'opacity-100'} ${task.checked ? 'opacity-60' : ''}`}
                   >
                     {/* Title Row */}
-                    <div className="flex items-center gap-2.5">
-                      <button 
-                        onClick={() => updateTask(task.id, { checked: !task.checked })}
-                        className="text-gray-500 hover:text-emerald-400 transition"
-                      >
-                        {task.checked ? '🟢' : '⚪'}
-                      </button>
-                      <h4 className={`flex-1 text-left text-xs font-bold text-white ${task.checked ? 'line-through text-gray-500' : ''}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <h4 className={`flex-1 text-sm font-bold text-white leading-snug ${task.checked ? 'line-through text-gray-500' : ''}`}>
                         {task.title}
                       </h4>
-                      <div className="text-gray-600">
-                        <Icon name="folder" size={14} />
-                      </div>
                     </div>
                     
                     {/* Description */}
                     {task.description && (
-                      <p className="w-full text-left text-[10px] text-gray-400 line-clamp-3 mt-2.5 pl-6 pr-2 leading-relaxed">
+                      <p className="w-full text-[11px] text-gray-400 line-clamp-3 mt-3 leading-relaxed">
                         {task.description}
                       </p>
                     )}
+
+                    {/* Bottom Status Tags */}
+                    <div className="mt-4 flex gap-2">
+                       <span className={`px-2.5 py-1 rounded-full border text-[9px] font-bold tracking-wide uppercase ${
+                        status === 'completed' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : status === 'in_progress' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-purple-500/10 border-purple-500/30 text-purple-400'
+                       }`}>
+                         {status === 'completed' ? 'Done' : status === 'in_progress' ? 'Dev' : 'Research'}
+                       </span>
+                    </div>
                   </div>
                 ))}
                 

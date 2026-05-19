@@ -44,10 +44,10 @@ export default function ChecklistPage() {
   if (loading) return <div className="flex h-screen items-center justify-center text-emerald-400 bg-[#08090d] font-sans">로딩중...</div>;
 
   return (
-    <div className="min-h-screen bg-[#0b0c10] text-[#cfd3db] font-sans pb-32 relative overflow-hidden select-none">
+    <div className="min-h-screen bg-transparent text-[#cfd3db] font-sans pb-32 relative overflow-hidden select-none">
       {/* Background Orbs */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500/10 rounded-full blur-[150px] pointer-events-none"></div>
-      <div className="absolute bottom-1/4 left-1/4 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[150px] pointer-events-none"></div>
+      <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-[150px] pointer-events-none"></div>
+      <div className="absolute bottom-1/4 left-1/4 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[150px] pointer-events-none"></div>
 
       <div className="max-w-4xl mx-auto space-y-8 p-6 relative z-10 pt-16">
         
@@ -73,11 +73,11 @@ export default function ChecklistPage() {
         </div>
 
         {/* Progress Widget */}
-        <div className="bg-[#13161f]/60 backdrop-blur-md border border-gray-800/80 rounded-3xl p-6 shadow-2xl flex items-center gap-6">
-          {/* Circular Progress (CSS Hack using conic-gradient) */}
-          <div className="relative w-24 h-24 shrink-0 rounded-full flex items-center justify-center bg-[#181b24] shadow-inner"
+        <div className="bg-black/30 backdrop-blur-2xl border border-white/5 rounded-3xl p-6 shadow-2xl flex items-center gap-8">
+          {/* Circular Progress */}
+          <div className="relative w-24 h-24 shrink-0 rounded-full flex items-center justify-center bg-[#181b24] shadow-[0_0_30px_rgba(16,185,129,0.2)]"
                style={{ background: `conic-gradient(#10b981 ${progress}%, #1f2937 ${progress}% 100%)` }}>
-            <div className="absolute inset-2 bg-[#13161f] rounded-full flex flex-col items-center justify-center">
+            <div className="absolute inset-2 bg-[#0a0b10] rounded-full flex flex-col items-center justify-center">
               <span className="text-xl font-bold text-emerald-400">{progress}%</span>
             </div>
           </div>
@@ -97,53 +97,51 @@ export default function ChecklistPage() {
           </div>
         </div>
 
-        {/* Task List */}
-        <div className="bg-[#13161f]/40 backdrop-blur-md border border-gray-800/50 rounded-3xl overflow-hidden shadow-2xl">
-          <div className="p-6 border-b border-gray-800/50 flex justify-between items-center bg-[#0f1118]/80">
-            <h3 className="text-sm font-bold text-white uppercase tracking-widest">To-Do Items</h3>
-            <span className="text-xs text-gray-500 font-mono">{tasks.length} items</span>
-          </div>
-          
-          <div className="divide-y divide-gray-800/50">
-            {tasks.map(task => (
-              <div 
-                key={task.id}
-                onClick={() => toggleCheck(task)}
-                className={`p-5 flex items-start gap-4 cursor-pointer transition-all duration-300 hover:bg-[#181b24] group ${task.checked ? 'bg-[#13161f]/80' : ''}`}
-              >
-                {/* Custom Checkbox */}
-                <div className={`mt-0.5 w-6 h-6 rounded-md border-2 flex items-center justify-center shrink-0 transition-all duration-300 ${
-                  task.checked 
-                    ? 'bg-emerald-500 border-emerald-500 text-black shadow-[0_0_10px_rgba(16,185,129,0.4)]' 
-                    : 'border-gray-600 bg-[#12131a] group-hover:border-emerald-500/50'
-                }`}>
-                  {task.checked && <span className="text-sm font-black">✓</span>}
-                </div>
+        {/* Task Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {tasks.map(task => (
+            <div 
+              key={task.id}
+              onClick={() => toggleCheck(task)}
+              className={`p-5 flex flex-col gap-3 rounded-2xl backdrop-blur-xl border cursor-pointer transition-all duration-300 group ${
+                task.checked 
+                  ? 'bg-emerald-950/10 border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.1)] hover:bg-emerald-950/20' 
+                  : 'bg-blue-950/10 border-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.05)] hover:bg-blue-950/20 hover:border-blue-500/50'
+              }`}
+            >
+              <div className="flex items-start justify-between w-full">
+                <div className="flex items-start gap-4">
+                  {/* Custom Checkbox */}
+                  <div className={`mt-0.5 w-7 h-7 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all duration-300 ${
+                    task.checked 
+                      ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.5)]' 
+                      : 'border-blue-500/50 bg-black/40 group-hover:border-blue-400'
+                  }`}>
+                    {task.checked && <span className="text-sm font-black">✓</span>}
+                  </div>
 
-                {/* Content */}
-                <div className={`flex-1 transition-all duration-300 ${task.checked ? 'opacity-50' : 'opacity-100'}`}>
-                  <h4 className={`text-base font-bold transition-all duration-300 ${task.checked ? 'text-gray-500 line-through' : 'text-gray-200 group-hover:text-emerald-400'}`}>
-                    {task.title}
-                  </h4>
-                  {task.description && (
-                    <p className="text-xs text-gray-500 mt-1.5 leading-relaxed pr-8">
-                      {task.description}
-                    </p>
-                  )}
+                  {/* Content */}
+                  <div className="flex-1">
+                    <h4 className={`text-base font-bold transition-all duration-300 ${task.checked ? 'text-gray-400 line-through' : 'text-gray-100 group-hover:text-blue-400'}`}>
+                      {task.title}
+                    </h4>
+                    {task.description && (
+                      <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                        {task.description}
+                      </p>
+                    )}
+                  </div>
                 </div>
                 
                 {/* Status Badge */}
-                <div className="shrink-0 mt-1">
-                  <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded-md border ${
-                    task.checked 
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                      : 'bg-gray-800 text-gray-400 border-gray-700'
-                  }`}>
-                    {task.checked ? 'Done' : 'Pending'}
-                  </span>
-                </div>
+                <span className={`text-[10px] font-bold tracking-wide shrink-0 ${
+                  task.checked ? 'text-emerald-400' : 'text-blue-400'
+                }`}>
+                  {task.checked ? 'Completed' : 'Pending'}
+                </span>
               </div>
-            ))}
+            </div>
+          ))}
             
             {tasks.length === 0 && (
               <div className="p-12 text-center text-gray-500 text-sm font-semibold">

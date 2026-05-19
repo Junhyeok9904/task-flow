@@ -300,13 +300,13 @@ export default function Home() {
   if (loading) return <div className="flex h-screen items-center justify-center text-emerald-400 bg-[#08090d] font-sans">로딩중...</div>;
 
   return (
-    <div className="h-screen flex flex-col bg-[#0b0c10] text-[#cfd3db] font-sans overflow-hidden select-none">
+    <div className="h-screen flex flex-col bg-transparent text-[#cfd3db] font-sans overflow-hidden select-none">
       
       {/* ─── Main 3-Panel Workspace ─── */}
       <div className="flex flex-1 overflow-hidden relative">
         
-        {/* PANEL 0: Vertical App Utility strip (Mocking visual mockup edge) */}
-        <aside className="w-14 bg-[#08090c] border-r border-gray-900 flex flex-col items-center py-4 justify-between shrink-0">
+        {/* PANEL 0: Vertical App Utility strip */}
+        <aside className="w-16 bg-black/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-6 justify-between shrink-0 shadow-[4px_0_24px_rgba(0,0,0,0.5)] z-20">
           <div className="flex flex-col items-center gap-6 w-full">
             {/* Spotify / Circular glowing wave logo */}
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-500 to-green-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 animate-pulse">
@@ -345,9 +345,11 @@ export default function Home() {
         </aside>
 
         {/* PANEL 1: Left Playlist Explorer Sidebar */}
-        <aside className="w-60 bg-[#0f1118] border-r border-[#181b24] flex flex-col shrink-0">
-          <div className="p-4 border-b border-gray-900">
-            <h1 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Playlist Explorer</h1>
+        <aside className="w-64 bg-[#0a0b10]/60 backdrop-blur-xl border-r border-white/5 flex flex-col shrink-0 z-10 shadow-[4px_0_24px_rgba(0,0,0,0.3)]">
+          <div className="p-6 border-b border-white/5">
+            <h1 className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+              <Icon name="library" size={14} /> Playlist Explorer
+            </h1>
           </div>
 
           <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
@@ -899,7 +901,9 @@ export default function Home() {
       {/* ─── Bottom Persistent Media Player Bar ─── */}
       {currentFile && (
         <>
-          <div className="h-16 bg-[#0f1118] border-t border-gray-900 flex items-center justify-between px-6 z-50 shrink-0 select-none">
+          <div className="h-20 bg-black/50 backdrop-blur-3xl border-t border-white/5 shadow-[0_-4px_30px_rgba(0,0,0,0.4)] flex items-center justify-between px-8 z-50 shrink-0 select-none relative">
+            {/* Subtle top glow line */}
+            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent"></div>
             {/* Left track details */}
             <div className="w-52 flex items-center gap-3">
               <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${getGradientFromTitle(currentFile.name)} flex items-center justify-center shrink-0 shadow overflow-hidden`}>
@@ -978,7 +982,7 @@ export default function Home() {
       {/* ─── MODAL: Duplicate Strategy Resolver ─── */}
       {duplicateModal?.isOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-[#13161f] border border-gray-800/80 rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-4">
+          <div className="bg-black/40 backdrop-blur-3xl border border-amber-500/20 rounded-3xl w-full max-w-sm p-8 shadow-[0_0_50px_rgba(245,158,11,0.15)] space-y-5">
             <div className="text-center">
               <span className="text-4xl">⚠️</span>
               <h3 className="text-sm font-bold text-white mt-2">중복 곡 감지됨</h3>
@@ -989,21 +993,24 @@ export default function Home() {
             <div className="grid grid-cols-1 gap-2 pt-2 text-xs font-semibold">
               <button
                 onClick={() => handleResolveDuplicate('skip')}
-                className="w-full py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition"
+                className="w-full py-3 bg-white/5 hover:bg-white/10 text-gray-300 rounded-xl border border-amber-500/30 hover:border-amber-500/60 transition shadow-[0_0_10px_rgba(245,158,11,0)] hover:shadow-[0_0_15px_rgba(245,158,11,0.2)]"
               >
-                Skip (중복 추가 안 함)
+                <span className="block text-amber-500 mb-0.5">--&gt;</span>
+                Skip <span className="text-[9px] text-gray-500 font-normal">(Do not add)</span>
               </button>
               <button
                 onClick={() => handleResolveDuplicate('replace')}
-                className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition shadow-lg shadow-amber-600/10"
+                className="w-full py-3 bg-white/5 hover:bg-white/10 text-gray-300 rounded-xl border border-amber-500/30 hover:border-amber-500/60 transition shadow-[0_0_10px_rgba(245,158,11,0)] hover:shadow-[0_0_15px_rgba(245,158,11,0.2)]"
               >
-                Replace (기존 항목 대체)
+                <span className="block text-amber-500 mb-0.5">🔀</span>
+                Replace <span className="text-[9px] text-gray-500 font-normal">(Override current)</span>
               </button>
               <button
                 onClick={() => handleResolveDuplicate('keep_both')}
-                className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-black rounded-lg transition shadow-lg shadow-emerald-600/10"
+                className="w-full py-3 bg-white/5 hover:bg-white/10 text-amber-400 rounded-xl border border-amber-500/50 hover:border-amber-400 transition shadow-[0_0_15px_rgba(245,158,11,0.1)] hover:shadow-[0_0_20px_rgba(245,158,11,0.3)]"
               >
-                Keep Both (중복 허용 및 추가)
+                <span className="block text-amber-400 mb-0.5">📄</span>
+                Keep Both <span className="text-[9px] text-amber-500/60 font-normal">(Allow duplicate)</span>
               </button>
             </div>
             <button
