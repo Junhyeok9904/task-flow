@@ -30,3 +30,10 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Global drag and drop styles */
+body.is-dragging, 
+body.is-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
