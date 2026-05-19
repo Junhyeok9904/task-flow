@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Icon } from '../../components/ui/Icon';
+import { BoardSkeleton, ErrorState, EmptyState } from '../../components/Skeletons';
 
 export default function BoardPage() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // DnD States
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
@@ -15,13 +17,22 @@ export default function BoardPage() {
   const loadTasks = async () => {
     try {
       const res = await fetch('/api/tasks');
+      if (!res.ok) {
+        throw new Error("서버에서 보드 태스크 데이터를 가져오지 못했습니다.");
+      }
       setTasks(await res.json());
-    } catch (e) { console.error(e); }
-    setLoading(false);
+      setError(null);
+    } catch (e: any) {
+      console.error(e);
+      setError(e.message || "서버 통신 오류가 발생했습니다.");
+    }
   };
 
   useEffect(() => {
-    loadTasks();
+    setLoading(true);
+    loadTasks().finally(() => {
+      setLoading(false);
+    });
   }, []);
 
   const updateTask = async (id: string, updates: any) => {
@@ -84,7 +95,23 @@ export default function BoardPage() {
   const colorMap: Record<string, string> = { pending: 'border-amber-500', in_progress: 'border-blue-500', completed: 'border-emerald-500' };
   const borderBgMap: Record<string, string> = { pending: 'border-l-4 border-l-amber-500', in_progress: 'border-l-4 border-l-blue-500', completed: 'border-l-4 border-l-emerald-500' };
 
-  if (loading) return <div className="flex h-screen items-center justify-center text-emerald-400 bg-[#08090d] font-sans">로딩중...</div>;
+  if (loading) return <BoardSkeleton />;
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#08090d] flex items-center justify-center p-6">
+        <ErrorState 
+          title="보드 데이터 로드 실패" 
+          message={error} 
+          onRetry={async () => {
+            setLoading(true);
+            await loadTasks();
+            setLoading(false);
+          }} 
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-transparent text-[#cfd3db] font-sans pb-32 relative overflow-hidden select-none">

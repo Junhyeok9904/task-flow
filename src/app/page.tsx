@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useUpload } from '../components/UploadManager';
 import { Icon } from '../components/ui/Icon';
 import { useAudioPlayer } from '../contexts/AudioProvider';
+import { DashboardSkeleton, ErrorState, EmptyState } from '../components/Skeletons';
 
 function fmtTime(s: number) {
   if (!isFinite(s) || isNaN(s)) return '00:00';
@@ -51,6 +52,7 @@ export default function Home() {
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [view, setView] = useState<'songs' | 'playlists' | 'upload' | 'recent'>('songs');
   
@@ -133,17 +135,24 @@ export default function Home() {
         fetch('/api/playlists')
       ]);
       
+      if (!mRes.ok || !pRes.ok) {
+        throw new Error("서버에서 미디어 및 플레이리스트 목록을 가져오지 못했습니다.");
+      }
+      
       setMediaFiles(await mRes.json());
       setPlaylists(await pRes.json());
-    } catch (e) {
+      setError(null);
+    } catch (e: any) {
       console.error(e);
+      setError(e.message || "서버 통신 오류가 발생했습니다.");
     }
   };
 
   // Hydration safety mount
   useEffect(() => {
     setMounted(true);
-    loadData().then(() => {
+    setLoading(true);
+    loadData().finally(() => {
       setLoading(false);
     });
   }, []);
@@ -330,7 +339,22 @@ export default function Home() {
   };
 
   if (!mounted) return null;
-  if (loading) return <div className="flex h-screen items-center justify-center text-emerald-400 bg-[#08090d] font-sans">로딩중...</div>;
+  if (loading) return <DashboardSkeleton />;
+  if (error) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-[#08090d] p-6">
+        <ErrorState 
+          title="서버 데이터 로드 실패" 
+          message={error} 
+          onRetry={async () => {
+            setLoading(true);
+            await loadData();
+            setLoading(false);
+          }} 
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-transparent text-[#cfd3db] font-sans overflow-hidden select-none">
@@ -709,45 +733,65 @@ export default function Home() {
                         </div>
                       );
                     })}
-                    {!sortedSongs.length && <p className="col-span-full text-center text-gray-600 py-12 text-xs">No media files available in this view.</p>}
+                    {!sortedSongs.length && (
+                      <div className="col-span-full py-8">
+                        <EmptyState 
+                          title="조회된 음악이 없습니다" 
+                          description="업로드된 미디어 파일이 없거나 검색 결과가 존재하지 않습니다." 
+                          actionLabel="새 미디어 추가하기"
+                          onAction={() => setView('upload')}
+                        />
+                      </div>
+                    )}
                   </div>
                 ) : (
                   /* Standard clean list view */
-                  <div className="bg-[#13161f] rounded-2xl border border-gray-900 overflow-hidden">
-                    <table className="w-full text-xs">
-                      <thead className="bg-[#0f1118]/80 text-gray-500 border-b border-gray-900">
-                        <tr>
-                          <th className="px-4 py-3 text-center w-10">#</th>
-                          <th className="px-4 py-3 text-left">Title</th>
-                          <th className="px-4 py-3 text-center w-20">Type</th>
-                          <th className="px-4 py-3 text-right w-24">Size</th>
-                          <th className="px-4 py-3 text-center w-28">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sortedSongs.map((f, idx) => (
-                          <tr 
-                            key={f.path} 
-                            onClick={() => setSelectedTrack(f)} 
-                            className={`border-b border-gray-900/40 hover:bg-[#181b24]/50 cursor-pointer transition ${selectedTrack?.path === f.path ? 'bg-emerald-500/5' : ''}`}
-                          >
-                            <td className="px-4 py-3 text-center text-gray-600 font-mono">{idx + 1}</td>
-                            <td className="px-4 py-3 font-semibold text-white truncate max-w-xs">{f.name}</td>
-                            <td className="px-4 py-3 text-center">
-                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${f.type === 'video' ? 'bg-purple-900/30 text-purple-400' : 'bg-blue-900/30 text-blue-400'}`}>{f.type.toUpperCase()}</span>
-                            </td>
-                            <td className="px-4 py-3 text-right text-gray-400 font-mono">{fmtSize(f.size)}</td>
-                            <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
-                              <div className="flex items-center justify-center gap-2">
-                                <button onClick={() => playFile(f)} className="text-emerald-400 hover:text-emerald-300 font-semibold">▶ Play</button>
-                                <button onClick={() => deleteFile(f.name)} className="text-rose-400 hover:text-rose-350 font-semibold">🗑 Del</button>
-                              </div>
-                            </td>
+                  sortedSongs.length === 0 ? (
+                    <div className="py-8">
+                      <EmptyState 
+                        title="조회된 음악이 없습니다" 
+                        description="업로드된 미디어 파일이 없거나 검색 결과가 존재하지 않습니다." 
+                        actionLabel="새 미디어 추가하기"
+                        onAction={() => setView('upload')}
+                      />
+                    </div>
+                  ) : (
+                    <div className="bg-[#13161f] rounded-2xl border border-gray-900 overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead className="bg-[#0f1118]/80 text-gray-500 border-b border-gray-900">
+                          <tr>
+                            <th className="px-4 py-3 text-center w-10">#</th>
+                            <th className="px-4 py-3 text-left">Title</th>
+                            <th className="px-4 py-3 text-center w-20">Type</th>
+                            <th className="px-4 py-3 text-right w-24">Size</th>
+                            <th className="px-4 py-3 text-center w-28">Actions</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {sortedSongs.map((f, idx) => (
+                            <tr 
+                              key={f.path} 
+                              onClick={() => setSelectedTrack(f)} 
+                              className={`border-b border-gray-900/40 hover:bg-[#181b24]/50 cursor-pointer transition ${selectedTrack?.path === f.path ? 'bg-emerald-500/5' : ''}`}
+                            >
+                              <td className="px-4 py-3 text-center text-gray-600 font-mono">{idx + 1}</td>
+                              <td className="px-4 py-3 font-semibold text-white truncate max-w-xs">{f.name}</td>
+                              <td className="px-4 py-3 text-center">
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${f.type === 'video' ? 'bg-purple-900/30 text-purple-400' : 'bg-blue-900/30 text-blue-400'}`}>{f.type.toUpperCase()}</span>
+                              </td>
+                              <td className="px-4 py-3 text-right text-gray-400 font-mono">{fmtSize(f.size)}</td>
+                              <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
+                                <div className="flex items-center justify-center gap-2">
+                                  <button onClick={() => playFile(f)} className="text-emerald-400 hover:text-emerald-300 font-semibold">▶ Play</button>
+                                  <button onClick={() => deleteFile(f.name)} className="text-rose-400 hover:text-rose-350 font-semibold">🗑 Del</button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
                 )}
               </>
             )}

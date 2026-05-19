@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { ChecklistSkeleton, ErrorState, EmptyState } from '../../components/Skeletons';
 
 export default function ChecklistPage() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Stats
   const totalTasks = tasks.length;
@@ -15,13 +17,22 @@ export default function ChecklistPage() {
   const loadTasks = async () => {
     try {
       const res = await fetch('/api/tasks');
+      if (!res.ok) {
+        throw new Error("서버에서 루틴 목록을 가져오지 못했습니다.");
+      }
       setTasks(await res.json());
-    } catch (e) { console.error(e); }
-    setLoading(false);
+      setError(null);
+    } catch (e: any) {
+      console.error(e);
+      setError(e.message || "서버 통신 오류가 발생했습니다.");
+    }
   };
 
   useEffect(() => {
-    loadTasks();
+    setLoading(true);
+    loadTasks().finally(() => {
+      setLoading(false);
+    });
   }, []);
 
   const toggleCheck = async (task: any) => {
@@ -30,18 +41,41 @@ export default function ChecklistPage() {
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, checked: newChecked } : t));
     
     // Background sync
-    await fetch('/api/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        action: 'update', 
-        id: task.id, 
-        updates: { checked: newChecked } 
-      }),
-    });
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'update', 
+          id: task.id, 
+          updates: { checked: newChecked } 
+        }),
+      });
+      if (!res.ok) throw new Error("업데이트 실패");
+    } catch (e) {
+      console.error(e);
+      // Rollback on failure
+      loadTasks();
+    }
   };
 
-  if (loading) return <div className="flex h-screen items-center justify-center text-emerald-400 bg-[#08090d] font-sans">로딩중...</div>;
+  if (loading) return <ChecklistSkeleton />;
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#08090d] flex items-center justify-center p-6">
+        <ErrorState 
+          title="체크리스트 로드 실패" 
+          message={error} 
+          onRetry={async () => {
+            setLoading(true);
+            await loadTasks();
+            setLoading(false);
+          }} 
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-transparent text-[#cfd3db] font-sans pb-32 relative overflow-hidden select-none">
@@ -144,8 +178,11 @@ export default function ChecklistPage() {
           ))}
 
           {tasks.length === 0 && (
-            <div className="col-span-2 p-12 text-center text-gray-500 text-sm font-semibold">
-              새로운 작업이 없습니다.
+            <div className="col-span-2 py-8">
+              <EmptyState 
+                title="등록된 데일리 루틴이 없습니다" 
+                description="할 일 목록을 만들거나 칸반 보드에서 작업을 생성해보세요."
+              />
             </div>
           )}
         </div>

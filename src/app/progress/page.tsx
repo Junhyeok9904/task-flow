@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useAudioPlayer } from '../../contexts/AudioProvider';
 import { MediaFile } from '../../types';
+import { ProgressSkeleton, ErrorState, EmptyState } from '../../components/Skeletons';
 
 function fmt(s: number) {
   if (!isFinite(s) || isNaN(s)) return '00:00';
@@ -41,30 +42,43 @@ export default function ProgressPage() {
   const SKIP = 10;
   const [mediaList, setMediaList] = useState<MediaFile[]>([]);
 
-  // Inline editing states
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const loadTasks = async () => {
-    try {
-      const res = await fetch('/api/tasks');
-      setTasks(await res.json());
-    } catch (e) { console.error(e); }
-    setLoading(false);
+    const res = await fetch('/api/tasks');
+    if (!res.ok) {
+      throw new Error("작업 진척 데이터를 가져오지 못했습니다.");
+    }
+    setTasks(await res.json());
   };
 
   const loadMedia = async () => {
+    const res = await fetch('/api/media');
+    if (!res.ok) {
+      throw new Error("미디어 파일 목록을 가져오지 못했습니다.");
+    }
+    const data = await res.json();
+    setMediaList(Array.isArray(data) ? data : []);
+  };
+
+  const loadAllData = async () => {
     try {
-      const res = await fetch('/api/media');
-      const data = await res.json();
-      setMediaList(Array.isArray(data) ? data : []);
-    } catch (e) { console.error(e); }
+      await Promise.all([loadTasks(), loadMedia()]);
+      setError(null);
+    } catch (e: any) {
+      console.error(e);
+      setError(e.message || "서버 통신 오류가 발생했습니다.");
+    }
   };
 
   useEffect(() => {
-    loadTasks();
-    loadMedia();
+    setLoading(true);
+    loadAllData().finally(() => {
+      setLoading(false);
+    });
   }, []);
 
   const playMedia = useCallback((item: MediaFile) => {
@@ -117,7 +131,23 @@ export default function ProgressPage() {
   };
   const completedPct = tasks.length ? Math.round(statusCounts.completed / tasks.length * 100) : 0;
 
-  if (loading) return <div className="flex h-screen items-center justify-center text-emerald-400 bg-[#08090d] font-sans">로딩중...</div>;
+  if (loading) return <ProgressSkeleton />;
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#08090d] flex items-center justify-center p-6">
+        <ErrorState 
+          title="진척 대시보드 로드 실패" 
+          message={error} 
+          onRetry={async () => {
+            setLoading(true);
+            await loadAllData();
+            setLoading(false);
+          }} 
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0b0c10] text-[#cfd3db] font-sans pb-32 relative overflow-hidden select-none">
