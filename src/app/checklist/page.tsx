@@ -142,13 +142,12 @@ export default function ChecklistPage() {
               </div>
             </div>
           ))}
-            
-            {tasks.length === 0 && (
-              <div className="p-12 text-center text-gray-500 text-sm font-semibold">
-                새로운 작업이 없습니다.
-              </div>
-            )}
-          </div>
+
+          {tasks.length === 0 && (
+            <div className="col-span-2 p-12 text-center text-gray-500 text-sm font-semibold">
+              새로운 작업이 없습니다.
+            </div>
+          )}
         </div>
       </div>
     </div>

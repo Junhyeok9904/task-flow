@@ -87,7 +87,40 @@ export default function Home() {
     trackName: string;
   } | null>(null);
 
+  // Cloudflare Tunnel State
+  const [tunnelUrl, setTunnelUrl] = useState<string | null>(null);
+  const [isTunneling, setIsTunneling] = useState(false);
+  const [tunnelLoading, setTunnelLoading] = useState(false);
 
+  const toggleTunnel = async () => {
+    setTunnelLoading(true);
+    try {
+      if (isTunneling) {
+        await fetch('/api/tunnel', { method: 'POST', body: JSON.stringify({ action: 'stop' }) });
+        setIsTunneling(false);
+        setTunnelUrl(null);
+      } else {
+        const res = await fetch('/api/tunnel', { method: 'POST', body: JSON.stringify({ action: 'start' }) });
+        const data = await res.json();
+        if (data.url) {
+          setTunnelUrl(data.url);
+          setIsTunneling(true);
+        }
+      }
+    } catch (e) { console.error(e); }
+    setTunnelLoading(false);
+  };
+
+  useEffect(() => {
+    fetch('/api/tunnel', { method: 'POST', body: JSON.stringify({ action: 'status' }) })
+      .then(r => r.json())
+      .then(d => {
+        if (d.url) {
+          setTunnelUrl(d.url);
+          setIsTunneling(true);
+        }
+      }).catch(() => {});
+  }, []);
 
   const loadData = async () => {
     try {
@@ -457,9 +490,40 @@ export default function Home() {
             </div>
           </nav>
 
+          {/* Cloudflare Tunnel Widget */}
+          <div className="p-4 border-t border-white/5 bg-black/20">
+            <div className="flex items-center justify-between text-[10px] text-gray-500 uppercase font-semibold mb-2">
+              <span>Public Access</span>
+              {isTunneling ? (
+                <span className="text-emerald-400 text-xs animate-pulse">☁️ Connected</span>
+              ) : (
+                <span className="text-gray-600 text-xs">☁️ Offline</span>
+              )}
+            </div>
+            
+            <button 
+              onClick={toggleTunnel} 
+              disabled={tunnelLoading}
+              className={`w-full py-2 rounded-lg text-xs font-bold transition-all border ${
+                isTunneling 
+                  ? 'bg-rose-500/10 text-rose-400 border-rose-500/30 hover:bg-rose-500/20' 
+                  : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
+              } ${tunnelLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {tunnelLoading ? 'Wait...' : isTunneling ? 'Stop Tunnel' : 'Start Public Tunnel'}
+            </button>
+            
+            {isTunneling && tunnelUrl && (
+              <div className="mt-2 text-center relative group cursor-pointer" onClick={() => { navigator.clipboard.writeText(tunnelUrl); alert('URL copied!'); }}>
+                <span className="text-[9px] text-emerald-400/80 font-mono break-all line-clamp-1 group-hover:text-emerald-400 transition">{tunnelUrl}</span>
+                <div className="text-[8px] text-gray-500 mt-0.5">Click to copy URL</div>
+              </div>
+            )}
+          </div>
+
           {/* Connected mini media playing status */}
           {currentFile && (
-            <div className="p-3 border-t border-gray-900 bg-[#08090d]/60">
+            <div className="p-3 border-t border-white/5 bg-[#08090d]/60 backdrop-blur-md">
               <div className="flex items-center justify-between text-[10px] text-gray-500 uppercase font-semibold mb-1">
                 <span>playing</span>
                 <span className="text-emerald-400 text-xs">⚡</span>

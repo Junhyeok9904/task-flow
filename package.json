@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "cloudflared": "^0.7.1",
     "music-metadata": "^11.12.3",
     "next": "16.2.6",
     "react": "19.2.4",
