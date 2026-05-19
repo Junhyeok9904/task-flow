@@ -1,5 +1,6 @@
 import { Task, MediaFile, Playlist } from '../types';
 import * as fs from 'fs';
+import * as fsp from 'fs/promises';
 import * as path from 'path';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -158,9 +159,32 @@ export function initializeTasks(): void {
   saveTasks(tasks);
 }
 
-// Media
+// ─── Media Write Lock ────────────────────────────────────────────
+// JSON 파일 기반 저장소는 동시 쓰기 시 데이터 유실 위험이 있으므로
+// 간단한 mutex 패턴으로 쓰기 작업을 직렬화합니다.
+let _mediaWriteLock: Promise<void> = Promise.resolve();
+
+function withMediaLock<T>(fn: () => Promise<T>): Promise<T> {
+  const prev = _mediaWriteLock;
+  let resolve: () => void;
+  _mediaWriteLock = new Promise<void>(r => { resolve = r; });
+  return prev.then(fn).finally(() => resolve!());
+}
+
+// Media (동기 읽기 - 성능 우선)
 export function getMediaFiles(): MediaFile[] {
   return readJSON(MEDIA_FILE, []);
+}
+
+// Media (비동기 읽기)
+export async function getMediaFilesAsync(): Promise<MediaFile[]> {
+  ensureDataDir();
+  try {
+    const data = await fsp.readFile(MEDIA_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch {
+    return [];
+  }
 }
 
 export function addMediaFile(file: MediaFile): void {
@@ -169,8 +193,25 @@ export function addMediaFile(file: MediaFile): void {
   writeJSON(MEDIA_FILE, files);
 }
 
+// 비동기 + write-lock 버전
+export function addMediaFileAsync(file: MediaFile): Promise<void> {
+  return withMediaLock(async () => {
+    const files = await getMediaFilesAsync();
+    files.push(file);
+    await fsp.writeFile(MEDIA_FILE, JSON.stringify(files, null, 2));
+  });
+}
+
 export function saveMediaFiles(files: MediaFile[]): void {
   writeJSON(MEDIA_FILE, files);
+}
+
+// 비동기 + write-lock 버전
+export function saveMediaFilesAsync(files: MediaFile[]): Promise<void> {
+  return withMediaLock(async () => {
+    ensureDataDir();
+    await fsp.writeFile(MEDIA_FILE, JSON.stringify(files, null, 2));
+  });
 }
 
 // Playlists bulk save (replaces entire file)

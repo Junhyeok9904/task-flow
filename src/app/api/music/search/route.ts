@@ -1,47 +1,35 @@
 import { NextResponse } from 'next/server';
-import { getMediaFiles } from '../../../../lib/store';
-import * as fs from 'fs';
-import * as path from 'path';
+import { getMediaFilesAsync } from '../../../../lib/store';
 
+export const dynamic = 'force-dynamic';
+
+/**
+ * GET /api/music/search - 미디어 파일 검색
+ * 
+ * 개선사항:
+ * 1. 파일시스템 스캔(readdirSync + statSync) 완전 제거
+ *    - 기존: 매 검색마다 전체 public/media/ 디렉토리 스캔
+ *    - 개선: media.json의 인덱싱된 데이터만 사용
+ * 2. 비동기 데이터 읽기로 이벤트 루프 블로킹 방지
+ * 3. 검색 로직은 기존과 동일하게 유지 (하위 호환)
+ */
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const query = (searchParams.get('q') || '').trim().toLowerCase();
     const typeFilter = searchParams.get('type'); // 'audio' | 'video'
 
-    // Gather all media files
-    const mediaFiles = getMediaFiles() || [];
-    let scanned: any[] = [];
-
-    const mediaDir = path.join(process.cwd(), 'public', 'media');
-    if (fs.existsSync(mediaDir)) {
-      const files = fs.readdirSync(mediaDir);
-      scanned = files.map(f => {
-        const fullPath = path.join(mediaDir, f);
-        const stat = fs.statSync(fullPath);
-        return {
-          name: f,
-          type: f.endsWith('.mp3') || f.endsWith('.wav') || f.endsWith('.ogg') || f.endsWith('.m4a') ? 'audio' : 'video',
-          path: `/media/${f}`,
-          size: stat.size,
-          addedAt: stat.birthtime.toISOString(),
-        };
-      });
-    }
-
-    // Merge lists by unique path
-    const pathMap = new Map<string, any>();
-    [...mediaFiles, ...scanned].forEach(item => {
-      pathMap.set(item.path, item);
-    });
-    let allTracks = Array.from(pathMap.values());
+    // ─── 데이터 소스: media.json만 사용 ────────────────────────
+    // 기존: getMediaFiles() + fs.readdirSync() 이중 소스 병합
+    // 개선: media.json 단일 소스 (파일시스템 스캔은 /api/media/sync로 분리)
+    let allTracks = await getMediaFilesAsync();
 
     // Filter by type if provided
     if (typeFilter) {
       allTracks = allTracks.filter(t => t.type === typeFilter);
     }
 
-    // If query is empty, return all (or top 100) sorted by date
+    // If query is empty, return all sorted by date
     if (!query) {
       allTracks.sort((a, b) => new Date(b.addedAt || 0).getTime() - new Date(a.addedAt || 0).getTime());
       return NextResponse.json(allTracks);
@@ -52,6 +40,7 @@ export async function GET(request: Request) {
     const scoredTracks = allTracks.map(track => {
       const name = (track.name || '').toLowerCase();
       const trackPath = (track.path || '').toLowerCase();
+      const artist = (track.artist || '').toLowerCase();
       let score = 0;
 
       queryWords.forEach(word => {
@@ -63,6 +52,8 @@ export async function GET(request: Request) {
           // Prefix bonus
           if (name.startsWith(word)) score += 20;
         }
+        // Artist match
+        if (artist.includes(word)) score += 40;
         // Extension/type match
         if (trackPath.includes(word)) score += 10;
       });
@@ -78,6 +69,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(results);
   } catch (e: any) {
+    console.error('Search error:', e);
     return NextResponse.json({ error: e.message || 'Search failed' }, { status: 500 });
   }
 }

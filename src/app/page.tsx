@@ -148,13 +148,25 @@ export default function Home() {
     }
   };
 
-  // Hydration safety mount
+  // Hydration safety mount + 백그라운드 파일 동기화
   useEffect(() => {
     setMounted(true);
     setLoading(true);
     loadData().finally(() => {
       setLoading(false);
     });
+
+    // 백그라운드: public/media에 수동 추가된 파일을 인덱싱
+    // GET /api/media에서 분리된 파일스캔 로직을 여기서 한 번만 호출
+    fetch('/api/media/sync', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+        if (d.synced > 0) {
+          console.log(`[Sync] ${d.synced}개 새 파일 인덱싱 완료`);
+          loadData(); // 새 파일이 있으면 목록 갱신
+        }
+      })
+      .catch(() => {}); // 동기화 실패 시 무시 (필수 아님)
   }, []);
 
   // Debounced search trigger
