@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useAudioPlayer } from '../../contexts/AudioProvider';
-import { MediaFile } from '../../types';
+import { MediaFile, Task, TaskStatus } from '../../types';
 import { ProgressSkeleton, ErrorState, EmptyState } from '../../components/Skeletons';
+import { usePointerDnd } from './usePointerDnd';
 
 function fmt(s: number) {
   if (!isFinite(s) || isNaN(s)) return '00:00';
@@ -14,7 +15,7 @@ function fmt(s: number) {
 }
 
 export default function ProgressPage() {
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
   const {
@@ -90,16 +91,34 @@ export default function ProgressPage() {
     }
   }, [mediaList, playPlaylistRewrite, playFile, queue]);
 
+  const handleUpdateTasksOnServer = async (updatedTasks: Task[]) => {
+    await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reorder', tasks: updatedTasks }),
+    });
+  };
+
+  const {
+    dragState,
+    ghost,
+    handlePointerDown,
+  } = usePointerDnd(tasks, setTasks, handleUpdateTasksOnServer);
+
   const updateTask = async (id: string, updates: any) => {
+    // Optimistic inline update
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+    
     await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'update', id, updates }),
     });
-    await loadTasks();
+    // Optional: reload tasks if needed, but optimistic update is usually fine
+    // await loadTasks();
   };
 
-  const startEdit = (task: any) => {
+  const startEdit = (task: Task) => {
     setEditingId(task.id);
     setEditTitle(task.title);
     setEditDesc(task.description || '');
@@ -120,9 +139,9 @@ export default function ProgressPage() {
     setEditDesc('');
   };
 
-  const labelMap: Record<string, string> = { pending: '대기 (Pending)', in_progress: '진행중 (In Progress)', completed: '완료 (Completed)' };
-  const colorMap: Record<string, string> = { pending: 'border-amber-500', in_progress: 'border-blue-500', completed: 'border-emerald-500' };
-  const borderBgMap: Record<string, string> = { pending: 'border-l-4 border-l-amber-500', in_progress: 'border-l-4 border-l-blue-500', completed: 'border-l-4 border-l-emerald-500' };
+  const labelMap: Record<TaskStatus, string> = { pending: '대기 (Pending)', in_progress: '진행중 (In Progress)', completed: '완료 (Completed)' };
+  const colorMap: Record<TaskStatus, string> = { pending: 'border-amber-500', in_progress: 'border-blue-500', completed: 'border-emerald-500' };
+  const borderBgMap: Record<TaskStatus, string> = { pending: 'border-l-4 border-l-amber-500', in_progress: 'border-l-4 border-l-blue-500', completed: 'border-l-4 border-l-emerald-500' };
   
   const statusCounts = {
     pending: tasks.filter(t => t.status === 'pending').length,
@@ -174,12 +193,6 @@ export default function ProgressPage() {
               ✓ 데일리 체크리스트
             </Link>
             <Link 
-              href="/board" 
-              className="px-4 py-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-400 border border-purple-500/30 rounded-xl hover:from-purple-500 hover:to-pink-400 hover:text-white font-bold text-xs transition duration-300 shadow-lg shadow-purple-500/5"
-            >
-              🚀 인터랙티브 보드로 이동
-            </Link>
-            <Link 
               href="/" 
               className="px-4 py-2 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl hover:from-emerald-500 hover:to-teal-400 hover:text-black font-bold text-xs transition duration-300 shadow-lg shadow-emerald-500/5"
             >
@@ -225,109 +238,172 @@ export default function ProgressPage() {
           </p>
         </div>
 
-        {/* Kanban Board Row */}
+        <p className="text-sm text-gray-400 font-semibold my-4">
+          카드를 마우스나 터치로 길게 끌어 원하는 위치나 열로 이동해 보세요. 넘칠 경우 상하단 경계 부근에서 자동으로 스크롤됩니다.
+        </p>
+
+        {/* Kanban Board Row (Drag and Drop Integrated) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {(['pending', 'in_progress', 'completed'] as const).map(status => (
-            <div key={status} className="bg-[#13161f]/60 backdrop-blur-md border border-gray-900 rounded-2xl overflow-hidden shadow-xl flex flex-col h-[65vh]">
-              {/* Kanban Column Header with glowing accent lines */}
-              <div className={`border-t-4 ${colorMap[status]} px-4 py-3 bg-[#0f1118]/80 flex justify-between items-center shrink-0`}>
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider">{labelMap[status]}</h3>
-                <span className="bg-[#181b24] border border-gray-800 px-2 py-0.5 rounded text-[10px] font-mono text-gray-400">
-                  {tasks.filter(t => t.status === status && t.checked).length} / {tasks.filter(t => t.status === status).length}
-                </span>
-              </div>
-              
-              {/* Column Item list */}
-              <div className="p-3 space-y-2.5 overflow-y-auto flex-1 bg-[#13161f]/20">
-                {tasks.filter(t => t.status === status).map(task => (
-                  <div 
-                    key={task.id} 
-                    className={`p-4 bg-[#181b24]/75 rounded-xl border border-gray-900/60 ${borderBgMap[status]} transition-all duration-300 hover:bg-[#1c1e29] ${task.checked ? 'opacity-50' : ''}`}
-                  >
-                    {/* Inline Editor */}
-                    {editingId === task.id ? (
-                      <div className="space-y-3.5">
-                        <input
-                          type="text"
-                          value={editTitle}
-                          onChange={e => setEditTitle(e.target.value)}
-                          placeholder="작업 제목 입력..."
-                          className="w-full bg-[#12131a] border border-gray-800 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          autoFocus
-                        />
-                        <textarea
-                          value={editDesc}
-                          onChange={e => setEditDesc(e.target.value)}
-                          placeholder="작업 설명 입력..."
-                          rows={2}
-                          className="w-full bg-[#12131a] border border-gray-800 rounded px-2.5 py-1.5 text-[11px] text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
-                        />
-                        <div className="flex gap-1.5">
-                          <button onClick={saveEdit} className="text-[10px] px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded transition">
-                            💾 저장
-                          </button>
-                          <button onClick={cancelEdit} className="text-[10px] px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 rounded transition">
-                            ✕ 취소
-                          </button>
-                        </div>
+          {(['pending', 'in_progress', 'completed'] as const).map(status => {
+            const columnTasks = tasks.filter(t => t.status === status);
+            
+            // Generate display tasks list (hiding the currently dragged task from its original place while dragging)
+            let displayTasks = [...columnTasks];
+            if (dragState.draggedTaskId) {
+              displayTasks = displayTasks.filter(t => t.id !== dragState.draggedTaskId);
+            }
+
+            // Map list elements
+            const cardElements = displayTasks.map((task, index) => {
+              return (
+                <div 
+                  key={task.id} 
+                  data-task-id={task.id}
+                  data-status={status}
+                  data-index={index}
+                  onPointerDown={(e) => {
+                    // Only start drag if we are not editing
+                    if (editingId !== task.id) {
+                      handlePointerDown(e, task.id, status, task.title, task.description);
+                    }
+                  }}
+                  style={{ touchAction: editingId === task.id ? 'auto' : 'none' }}
+                  className={`p-4 bg-[#181b24]/75 rounded-xl border transition-all duration-200 shadow-sm
+                    ${editingId === task.id ? '' : 'cursor-grab active:cursor-grabbing hover:bg-[#1c1e29]'}
+                    ${borderBgMap[status]} 
+                    ${task.checked ? 'opacity-65' : 'opacity-100'}
+                  `}
+                >
+                  {/* Inline Editor */}
+                  {editingId === task.id ? (
+                    <div className="space-y-3.5 pointer-events-auto" onPointerDown={e => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        value={editTitle}
+                        onChange={e => setEditTitle(e.target.value)}
+                        placeholder="작업 제목 입력..."
+                        className="w-full bg-[#12131a] border border-gray-800 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        autoFocus
+                      />
+                      <textarea
+                        value={editDesc}
+                        onChange={e => setEditDesc(e.target.value)}
+                        placeholder="작업 설명 입력..."
+                        rows={2}
+                        className="w-full bg-[#12131a] border border-gray-800 rounded px-2.5 py-1.5 text-[11px] text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                      />
+                      <div className="flex gap-1.5">
+                        <button onClick={saveEdit} className="text-[10px] px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded transition">
+                          💾 저장
+                        </button>
+                        <button onClick={cancelEdit} className="text-[10px] px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 rounded transition">
+                          ✕ 취소
+                        </button>
                       </div>
-                    ) : (
-                      /* Display elements */
-                      <>
-                        {/* Title Row */}
-                        <div className="flex items-center gap-2.5">
-                          <button 
-                            onClick={() => updateTask(task.id, { checked: !task.checked })}
-                            className="text-gray-500 hover:text-emerald-400 transition"
-                          >
-                            {task.checked ? '🟢' : '⚪'}
-                          </button>
-                          <button 
-                            onClick={() => startEdit(task)}
-                            className={`flex-1 text-left text-xs font-bold hover:text-blue-400 transition text-white ${task.checked ? 'line-through text-gray-500' : ''}`}
-                          >
-                            {task.title} <span className="text-[9px] text-gray-600 opacity-0 hover:opacity-100 transition pl-1">✏️</span>
-                          </button>
-                        </div>
-                        
-                        {/* Description */}
-                        {task.description && (
-                          <button 
-                            onClick={() => startEdit(task)}
-                            className="block w-full text-left text-[10px] text-gray-500 hover:text-blue-400 truncate mt-1.5 pl-6"
-                          >
-                            📝 {task.description}
+                    </div>
+                  ) : (
+                    /* Display elements */
+                    <>
+                      {/* Title Row */}
+                      <div className="flex items-start justify-between gap-2.5 pointer-events-none">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); updateTask(task.id, { checked: !task.checked }); }}
+                          className="text-gray-500 hover:text-emerald-400 transition pointer-events-auto mt-0.5"
+                        >
+                          {task.checked ? '🟢' : '⚪'}
+                        </button>
+                        <h4 className={`flex-1 text-sm font-bold text-white leading-snug ${task.checked ? 'line-through text-gray-500' : ''}`}>
+                          {task.title}
+                        </h4>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); startEdit(task); }}
+                          className="text-[10px] text-gray-600 hover:text-blue-400 transition pointer-events-auto pl-1 self-start"
+                        >
+                          ✏️
+                        </button>
+                      </div>
+                      
+                      {/* Description */}
+                      {task.description && (
+                        <p className="w-full text-[11px] text-gray-400 line-clamp-3 mt-2 pl-6 leading-relaxed pointer-events-none">
+                          {task.description}
+                        </p>
+                      )}
+                      
+                      {/* Kanban Actions */}
+                      <div className="flex gap-1 mt-3 pl-6 flex-wrap pointer-events-auto">
+                        {status !== 'pending' && (
+                          <button onPointerDown={e => e.stopPropagation()} onClick={() => updateTask(task.id, { status: 'pending' })} className="text-[8px] font-bold px-2 py-1 bg-gray-900 border border-gray-850 hover:bg-[#1b2520] hover:text-amber-400 text-gray-400 rounded-md transition uppercase">
+                            ← 대기
                           </button>
                         )}
-                        
-                        {/* Kanban Actions */}
-                        <div className="flex gap-1 mt-3 pl-6 flex-wrap">
-                          {status !== 'pending' && (
-                            <button onClick={() => updateTask(task.id, { status: 'pending' })} className="text-[8px] font-bold px-2 py-1 bg-gray-900 border border-gray-850 hover:bg-[#1b2520] hover:text-amber-400 text-gray-400 rounded-md transition uppercase">
-                              ← 대기
-                            </button>
-                          )}
-                          {status !== 'in_progress' && (
-                            <button onClick={() => updateTask(task.id, { status: 'in_progress' })} className="text-[8px] font-bold px-2 py-1 bg-gray-900 border border-gray-850 hover:bg-[#1b2520] hover:text-blue-400 text-gray-400 rounded-md transition uppercase">
-                              → 진행
-                            </button>
-                          )}
-                          {status !== 'completed' && (
-                            <button onClick={() => updateTask(task.id, { checked: true, status: 'completed' })} className="text-[8px] font-bold px-2 py-1 bg-gray-900 border border-gray-850 hover:bg-[#1b2520] hover:text-emerald-400 text-gray-400 rounded-md transition uppercase">
-                              ✓ 완료
-                            </button>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))}
-                {!tasks.filter(t => t.status === status).length && (
-                  <p className="text-center py-8 text-gray-600 text-xs font-semibold">이 컬럼에 등록된 작업이 없습니다.</p>
-                )}
+                        {status !== 'in_progress' && (
+                          <button onPointerDown={e => e.stopPropagation()} onClick={() => updateTask(task.id, { status: 'in_progress' })} className="text-[8px] font-bold px-2 py-1 bg-gray-900 border border-gray-850 hover:bg-[#1b2520] hover:text-blue-400 text-gray-400 rounded-md transition uppercase">
+                            → 진행
+                          </button>
+                        )}
+                        {status !== 'completed' && (
+                          <button onPointerDown={e => e.stopPropagation()} onClick={() => updateTask(task.id, { checked: true, status: 'completed' })} className="text-[8px] font-bold px-2 py-1 bg-gray-900 border border-gray-850 hover:bg-[#1b2520] hover:text-emerald-400 text-gray-400 rounded-md transition uppercase">
+                            ✓ 완료
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            });
+
+            // Insert placeholder card at targetIndex
+            const isTargetColumn = dragState.targetStatus === status;
+            if (dragState.draggedTaskId && isTargetColumn) {
+              const placeholderCard = (
+                <div 
+                  key="drag-placeholder"
+                  className={`p-5 rounded-2xl border-2 border-dashed h-[110px] flex items-center justify-center text-xs font-bold transition-all duration-200 bg-white/5 animate-pulse
+                    ${status === 'completed' ? 'border-emerald-500/40 text-emerald-400/50' : status === 'in_progress' ? 'border-blue-500/40 text-blue-400/50' : 'border-purple-500/40 text-purple-400/50'}
+                  `}
+                >
+                  이곳에 드롭
+                </div>
+              );
+              const insertIdx = Math.min(Math.max(0, dragState.targetIndex), cardElements.length);
+              cardElements.splice(insertIdx, 0, placeholderCard);
+            }
+
+            const isHovered = dragState.targetStatus === status;
+
+            return (
+              <div 
+                key={status} 
+                data-status={status}
+                className={`column-container bg-[#13161f]/60 backdrop-blur-md border rounded-2xl overflow-hidden shadow-xl flex flex-col h-[65vh] transition-all duration-300 ${
+                  isHovered 
+                    ? 'border-purple-500/60 shadow-[0_0_20px_rgba(168,85,247,0.2)] bg-black/60 scale-[1.01]' 
+                    : 'border-gray-900 hover:border-gray-800'
+                }`}
+              >
+                {/* Kanban Column Header with glowing accent lines */}
+                <div className={`border-t-4 ${colorMap[status]} px-4 py-3 bg-[#0f1118]/80 flex justify-between items-center shrink-0 pointer-events-none`}>
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider">{labelMap[status]}</h3>
+                  <span className="bg-[#181b24] border border-gray-800 px-2 py-0.5 rounded text-[10px] font-mono text-gray-400">
+                    {tasks.filter(t => t.status === status && t.checked).length} / {columnTasks.length}
+                  </span>
+                </div>
+                
+                {/* Column Item list */}
+                <div className="column-list p-3 space-y-2.5 overflow-y-auto flex-1 bg-[#13161f]/20">
+                  {cardElements}
+                  
+                  {cardElements.length === 0 && (
+                    <div className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-gray-800 rounded-xl mt-4 pointer-events-none">
+                      <p className="text-gray-600 text-xs font-semibold">이곳에 카드를 드롭하세요</p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Music Player widget sync with Dark-Glass HUD */}
@@ -354,6 +430,37 @@ export default function ProgressPage() {
           )}
         </div>
       </div>
+
+      {/* Ghost Preview Card overlay */}
+      {ghost && (
+        <div
+          style={{
+            position: 'fixed',
+            left: ghost.x - ghost.offsetX,
+            top: ghost.y - ghost.offsetY,
+            width: ghost.width,
+            height: ghost.height,
+            pointerEvents: 'none',
+            zIndex: 9999,
+            transform: 'rotate(2.5deg) scale(1.03)',
+            transition: 'transform 0.05s ease-out',
+          }}
+          className={`p-4 bg-white/10 backdrop-blur-2xl rounded-xl border shadow-[0_20px_50px_rgba(168,85,247,0.3)] text-[#cfd3db] select-none
+            ${borderBgMap[ghost.status]}
+          `}
+        >
+          <div className="flex items-start justify-between gap-2.5">
+            <h4 className="flex-1 text-sm font-bold text-white leading-snug">
+              {ghost.title}
+            </h4>
+          </div>
+          {ghost.description && (
+            <p className="w-full text-[11px] text-gray-400 line-clamp-3 mt-2 pl-6 leading-relaxed">
+              {ghost.description}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* ─── Persistent Glassmorphic Player bar ─── */}
       {currentFile && (
