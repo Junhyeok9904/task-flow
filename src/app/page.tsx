@@ -99,7 +99,20 @@ export default function Home() {
     confirmText?: string;
     cancelText?: string;
     isDanger?: boolean;
+    isAlert?: boolean;
   } | null>(null);
+
+  const showAlert = (title: string, message: string, isDanger: boolean = false) => {
+    setConfirmDialog({
+      isOpen: true,
+      title,
+      message,
+      confirmText: '확인',
+      isDanger,
+      isAlert: true,
+      onConfirm: () => {}
+    });
+  };
 
   // Cloudflare Tunnel State
   const [tunnelUrl, setTunnelUrl] = useState<string | null>(null);
@@ -237,7 +250,7 @@ export default function Home() {
             setQueue(prev => prev.filter(q => q.name !== filename));
             await loadData();
           } else {
-            alert('Failed to delete file');
+            showAlert('에러', '파일 삭제에 실패했습니다.', true);
           }
         } catch (e) { console.error(e); }
       }
@@ -283,9 +296,9 @@ export default function Home() {
             setQueue(prev => prev.filter(q => !filenamesToDelete.includes(q.name)));
             setSelectedTracksList([]);
             await loadData();
-            alert('Selected files deleted successfully');
+            showAlert('성공', '선택한 파일이 성공적으로 삭제되었습니다.');
           } else {
-            alert('Failed to delete selected files');
+            showAlert('에러', '선택한 파일 삭제에 실패했습니다.', true);
           }
         } catch (e) {
           console.error(e);
@@ -346,7 +359,7 @@ export default function Home() {
         });
       } else {
         await loadData();
-        alert('Playlist updated successfully!');
+        showAlert('성공', '플레이리스트가 성공적으로 업데이트되었습니다.');
       }
     } catch (e) {
       console.error(e);
@@ -383,7 +396,7 @@ export default function Home() {
     setSelectedTracksList([]);
     await loadData();
     if (!duplicateOccurred) {
-      alert('Batch addition complete!');
+      showAlert('성공', '선택한 곡들이 플레이리스트에 추가되었습니다.');
     }
   };
 
@@ -681,7 +694,7 @@ export default function Home() {
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(tunnelUrl);
-                    alert('Public URL copied to clipboard!');
+                    showAlert('성공', '공공 터널 URL이 클립보드에 복사되었습니다.');
                   }}
                   className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 text-black rounded-lg text-xs font-bold transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-1.5 active:scale-95"
                 >
@@ -1411,21 +1424,23 @@ export default function Home() {
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
           <div className={`bg-[#0a0a0d]/90 backdrop-blur-3xl border ${confirmDialog.isDanger ? 'border-rose-500/20 shadow-[0_0_50px_rgba(244,63,94,0.15)]' : 'border-emerald-500/20 shadow-[0_0_50px_rgba(16,185,129,0.15)]'} rounded-3xl w-full max-w-sm p-8 space-y-6`}>
             <div className="text-center">
-              <span className="text-4xl">{confirmDialog.isDanger ? '🚨' : '❓'}</span>
+              <span className="text-4xl">{confirmDialog.isDanger ? '🚨' : (confirmDialog.isAlert ? '✅' : '❓')}</span>
               <h3 className="text-sm font-bold text-white mt-2">{confirmDialog.title}</h3>
               <p className="text-xs text-gray-400 mt-2 max-w-[280px] mx-auto break-all leading-relaxed">
                 {confirmDialog.message}
               </p>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setConfirmDialog(null);
-                }}
-                className="flex-1 py-2.5 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl border border-white/5 transition text-xs font-bold"
-              >
-                {confirmDialog.cancelText || 'Cancel'}
-              </button>
+             <div className="flex gap-2">
+              {!confirmDialog.isAlert && (
+                <button
+                  onClick={() => {
+                    setConfirmDialog(null);
+                  }}
+                  className="flex-1 py-2.5 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl border border-white/5 transition text-xs font-bold"
+                >
+                  {confirmDialog.cancelText || 'Cancel'}
+                </button>
+              )}
               <button
                 onClick={() => {
                   confirmDialog.onConfirm();
