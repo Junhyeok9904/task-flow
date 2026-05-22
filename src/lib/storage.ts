@@ -87,6 +87,13 @@ export async function saveFileStream(file: File, filename: string): Promise<Stor
 
 
   const targetPath = path.join(MEDIA_DIR, filename);
+  
+  // Ensure target directory exists for nested folder uploads
+  const targetDir = path.dirname(targetPath);
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
+
   const writeStream = fs.createWriteStream(targetPath);
 
   try {
@@ -191,6 +198,15 @@ export async function deleteMediaFile(filename: string, mediaId?: string): Promi
   try {
     await fsp.access(targetPath);
     await fsp.unlink(targetPath);
+
+    // Clean up empty parent directory if it is a subfolder inside MEDIA_DIR
+    const parentDir = path.dirname(targetPath);
+    if (parentDir !== MEDIA_DIR && parentDir.startsWith(MEDIA_DIR)) {
+      const files = await fsp.readdir(parentDir);
+      if (files.length === 0) {
+        await fsp.rmdir(parentDir);
+      }
+    }
   } catch {
     return false;
   }
@@ -245,26 +261,39 @@ export async function scanMediaDirectory(): Promise<Array<{
   size: number;
   addedAt: string;
 }>> {
-  try {
-    const files = await fsp.readdir(MEDIA_DIR);
+  async function scanDirRecursive(currentDir: string): Promise<Array<{
+    name: string;
+    type: 'audio' | 'video';
+    path: string;
+    size: number;
+    addedAt: string;
+  }>> {
+    const entries = await fsp.readdir(currentDir, { withFileTypes: true });
     const results = [];
 
-    for (const filename of files) {
-      if (!isAllowedExtension(filename)) continue;
-
-      const fullPath = path.join(MEDIA_DIR, filename);
-      const stat = await fsp.stat(fullPath);
-
-      results.push({
-        name: filename,
-        type: getMediaType(filename),
-        path: `/media/${filename}`,
-        size: stat.size,
-        addedAt: stat.birthtime.toISOString(),
-      });
+    for (const entry of entries) {
+      const fullPath = path.join(currentDir, entry.name);
+      if (entry.isDirectory()) {
+        const subResults = await scanDirRecursive(fullPath);
+        results.push(...subResults);
+      } else {
+        if (!isAllowedExtension(entry.name)) continue;
+        const stat = await fsp.stat(fullPath);
+        const relativePath = path.relative(MEDIA_DIR, fullPath).replace(/\\/g, '/');
+        results.push({
+          name: relativePath,
+          type: getMediaType(entry.name),
+          path: `/media/${relativePath}`,
+          size: stat.size,
+          addedAt: stat.birthtime.toISOString(),
+        });
+      }
     }
-
     return results;
+  }
+
+  try {
+    return await scanDirRecursive(MEDIA_DIR);
   } catch {
     return [];
   }

@@ -30,7 +30,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    const filename = file.name;
+    const folder = formData.get('folder') as string | null;
+    let filename = file.name;
+    if (folder) {
+      // Clean folder path to prevent path traversal (e.g. removing ..)
+      const cleanFolder = folder.replace(/\.\./g, '').replace(/^\/+|\/+$/g, '');
+      if (cleanFolder) {
+        filename = `${cleanFolder}/${filename}`;
+      }
+    }
 
     // ─── Validation ────────────────────────────────────────────
     if (!isAllowedExtension(filename)) {

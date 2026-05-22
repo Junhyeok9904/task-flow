@@ -27,7 +27,7 @@ export async function POST(request: Request) {
       // Determine the port (default Next.js is 3000, but let's allow ENV override)
       const port = process.env.PORT || '3000';
 
-      return new Promise((resolve) => {
+      return new Promise<Response>((resolve) => {
         // Spawn cloudflared from the locally installed npm package
         // Note: cloudflared outputs all its logs to stderr, not stdout.
         // shell: true is required on Windows to resolve npx batch script (.cmd)

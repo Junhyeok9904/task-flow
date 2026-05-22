@@ -6,13 +6,18 @@ interface AudioContextType {
   currentFile: MediaFile | null;
   setCurrentFile: (f: MediaFile | null) => void;
   isPlaying: boolean;
+  setIsPlaying: React.Dispatch<React.SetStateAction<boolean>>;
   currentTime: number;
+  setCurrentTime: React.Dispatch<React.SetStateAction<number>>;
   duration: number;
+  setDuration: React.Dispatch<React.SetStateAction<number>>;
   volume: number;
   queue: MediaFile[];
   queueIndex: number;
+  setQueueIndex: React.Dispatch<React.SetStateAction<number>>;
   repeatMode: 'none' | 'all' | 'one';
   isShuffle: boolean;
+  setIsShuffle: React.Dispatch<React.SetStateAction<boolean>>;
   setVolume: (v: number) => void;
   setQueue: React.Dispatch<React.SetStateAction<MediaFile[]>>;
   setRepeatMode: React.Dispatch<React.SetStateAction<'none' | 'all' | 'one'>>;
@@ -277,8 +282,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
   return (
     <AudioContext.Provider value={{
-      currentFile, setCurrentFile, isPlaying, currentTime, duration, volume, queue, queueIndex, repeatMode, isShuffle,
-      setVolume, setQueue, setRepeatMode, toggleShuffle, toggleRepeat, playFile, playPlaylistRewrite,
+      currentFile, setCurrentFile, isPlaying, setIsPlaying, currentTime, setCurrentTime,
+      duration, setDuration, volume, setVolume, queue, setQueue, queueIndex, setQueueIndex,
+      repeatMode, setRepeatMode, isShuffle, setIsShuffle,
+      toggleShuffle, toggleRepeat, playFile, playPlaylistRewrite,
       playPlaylistAppend, handlePrev, handleNext, togglePlay, seekBy, seekTo, getMediaEl: getAudio
     }}>
       {children}

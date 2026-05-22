@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MediaFile, Playlist } from '../types';
 import Link from 'next/link';
 import { useUpload } from '../components/UploadManager';
@@ -70,6 +70,7 @@ export default function Home() {
   const [activeFilterTag, setActiveFilterTag] = useState<'all' | 'audio' | 'video'>('all');
   const [activeGenreTag, setActiveGenreTag] = useState<string>('Ambient Electronica'); // Active tag badge
   const [selectedTrack, setSelectedTrack] = useState<MediaFile | null>(null);
+  const [currentFolder, setCurrentFolder] = useState<string>(''); // '' is root folder
   const [selectedTracksList, setSelectedTracksList] = useState<string[]>([]); // Multi-select list
   const [dragOver, setDragOver] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
@@ -386,7 +387,7 @@ export default function Home() {
 
   const handleUpload = async (files: FileList | null) => {
     if (!files?.length) return;
-    enqueueFiles(Array.from(files));
+    enqueueFiles(Array.from(files), currentFolder);
   };
 
   const onDrop = async (e: React.DragEvent) => {
@@ -401,6 +402,38 @@ export default function Home() {
     if (sortBy === 'size') return (b.size || 0) - (a.size || 0);
     return new Date(b.addedAt || 0).getTime() - new Date(a.addedAt || 0).getTime();
   });
+
+  const getParentFolder = (filePath: string) => {
+    const relative = filePath.replace(/^\/media\//, '');
+    const parts = relative.split('/');
+    if (parts.length > 1) {
+      return parts.slice(0, -1).join('/');
+    }
+    return '';
+  };
+
+  const currentFolders = Array.from(new Set(
+    sortedSongs
+      .map(s => getParentFolder(s.path))
+      .filter(p => {
+        if (!p) return false;
+        if (currentFolder === '') {
+          return true;
+        } else {
+          return p.startsWith(currentFolder + '/');
+        }
+      })
+      .map(p => {
+        if (currentFolder === '') {
+          return p.split('/')[0];
+        } else {
+          const relative = p.slice(currentFolder.length + 1);
+          return relative.split('/')[0];
+        }
+      })
+  )).filter(Boolean).sort((a, b) => a.localeCompare(b));
+
+  const currentSongs = sortedSongs.filter(s => getParentFolder(s.path) === currentFolder);
 
   const toggleSelectTrack = (path: string) => {
     setSelectedTracksList(prev =>
@@ -733,7 +766,7 @@ export default function Home() {
               <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Active searched & uploaded music files</h2>
             )}
             <div className="flex items-center gap-3 text-[10px] text-gray-500">
-              <span>{sortedSongs.length} tracks found</span>
+              <span>{currentSongs.length} tracks in folder ({sortedSongs.length} total)</span>
               
               <div className="bg-[#12131a] p-0.5 rounded-lg border border-gray-800 flex gap-0.5">
                 <button onClick={() => setLayoutMode('grid')} className={`p-1 rounded transition ${layoutMode === 'grid' ? 'bg-[#181b24] text-white' : 'text-gray-500 hover:text-gray-300'}`}>🎴</button>
@@ -755,10 +788,66 @@ export default function Home() {
 
             {view === 'songs' && (
               <>
+                {/* Breadcrumbs Navigation */}
+                <div className="flex items-center gap-2 mb-6 bg-[#13161f]/40 border border-gray-900/60 rounded-xl px-4 py-2.5 text-xs text-gray-400 backdrop-blur-md">
+                  <button 
+                    onClick={() => setCurrentFolder('')} 
+                    className={`hover:text-emerald-400 font-bold transition flex items-center gap-1 ${currentFolder === '' ? 'text-emerald-400 font-extrabold' : 'text-gray-300'}`}
+                  >
+                    🏠 Home
+                  </button>
+                  {currentFolder.split('/').filter(Boolean).map((part, index, arr) => {
+                    const targetPath = arr.slice(0, index + 1).join('/');
+                    const isLast = index === arr.length - 1;
+                    return (
+                      <React.Fragment key={targetPath}>
+                        <span className="text-gray-600">/</span>
+                        <button 
+                          onClick={() => setCurrentFolder(targetPath)} 
+                          className={`hover:text-emerald-400 font-bold transition ${isLast ? 'text-emerald-400 font-extrabold' : 'text-gray-300'}`}
+                        >
+                          {part}
+                        </button>
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+
                 {layoutMode === 'grid' ? (
                   /* HIGH FIDELITY DRIBBBLE GRID MODE */
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-5">
-                    {sortedSongs.map(f => {
+                    {/* Render Folders First */}
+                    {currentFolders.map(folderName => {
+                      const fullFolderPath = currentFolder ? `${currentFolder}/${folderName}` : folderName;
+                      const songCount = sortedSongs.filter(s => {
+                        const pf = getParentFolder(s.path);
+                        return pf === fullFolderPath || pf.startsWith(fullFolderPath + '/');
+                      }).length;
+
+                      return (
+                        <div
+                          key={fullFolderPath}
+                          onClick={() => setCurrentFolder(fullFolderPath)}
+                          className="group relative bg-[#13161f]/80 rounded-2xl p-4 border border-gray-900 transition-all duration-300 hover:bg-[#161a25]/90 hover:-translate-y-0.5 hover:border-emerald-500/50 hover:shadow-[0_0_15px_rgba(16,185,129,0.08)] cursor-pointer flex items-center gap-4"
+                        >
+                          <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition-transform duration-300">
+                            📂
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-bold text-xs text-white truncate group-hover:text-emerald-400 transition-colors" title={folderName}>
+                              {folderName}
+                            </h3>
+                            <span className="text-[10px] text-gray-500 block">{songCount} tracks</span>
+                          </div>
+                          <div className="text-gray-600 group-hover:text-emerald-400 font-bold text-xs transition-colors">
+                            ➔
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Render Songs */}
+                    {currentSongs.map(f => {
                       const isSelected = selectedTrack?.path === f.path;
                       const isPlayingFile = isPlaying && currentFile?.path === f.path;
                       const isChecked = selectedTracksList.includes(f.path);
@@ -790,7 +879,9 @@ export default function Home() {
                               )}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <h3 className="font-bold text-xs text-white truncate pr-4" title={f.name}>{f.name}</h3>
+                              <h3 className="font-bold text-xs text-white truncate pr-4" title={f.name}>
+                                {f.name.split('/').pop()}
+                              </h3>
                               <span className="text-[10px] text-gray-500 truncate block w-full">{f.artist || 'Unknown Artist'}</span>
                             </div>
                             <button className="text-gray-600 hover:text-gray-300 text-xs self-start mt-1">︙</button>
@@ -832,7 +923,7 @@ export default function Home() {
                         </div>
                       );
                     })}
-                    {!sortedSongs.length && (
+                    {!currentFolders.length && !currentSongs.length && (
                       <div className="col-span-full py-8">
                         <EmptyState 
                           title="조회된 음악이 없습니다" 
@@ -845,7 +936,7 @@ export default function Home() {
                   </div>
                 ) : (
                   /* Standard clean list view */
-                  sortedSongs.length === 0 ? (
+                  (!currentFolders.length && !currentSongs.length) ? (
                     <div className="py-8">
                       <EmptyState 
                         title="조회된 음악이 없습니다" 
@@ -862,10 +953,10 @@ export default function Home() {
                             <th className="px-4 py-3 text-center w-10">
                               <input 
                                 type="checkbox"
-                                checked={sortedSongs.length > 0 && sortedSongs.every(s => selectedTracksList.includes(s.path))}
+                                checked={currentSongs.length > 0 && currentSongs.every(s => selectedTracksList.includes(s.path))}
                                 onChange={(e) => {
                                   if (e.target.checked) {
-                                    setSelectedTracksList(sortedSongs.map(s => s.path));
+                                    setSelectedTracksList(currentSongs.map(s => s.path));
                                   } else {
                                     setSelectedTracksList([]);
                                   }
@@ -880,7 +971,33 @@ export default function Home() {
                           </tr>
                         </thead>
                         <tbody>
-                          {sortedSongs.map((f, idx) => {
+                          {/* Render Folders First */}
+                          {currentFolders.map(folderName => {
+                            const fullFolderPath = currentFolder ? `${currentFolder}/${folderName}` : folderName;
+                            return (
+                              <tr 
+                                key={fullFolderPath} 
+                                onClick={() => setCurrentFolder(fullFolderPath)} 
+                                className="border-b border-gray-900/40 hover:bg-[#181b24]/50 cursor-pointer transition text-emerald-400 font-semibold font-sans"
+                              >
+                                <td className="px-4 py-3 text-center"></td>
+                                <td className="px-4 py-3 flex items-center gap-2">
+                                  <span>📂</span>
+                                  <span className="truncate max-w-xs">{folderName}</span>
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-900/20 text-emerald-400">FOLDER</span>
+                                </td>
+                                <td className="px-4 py-3 text-right text-gray-500">-</td>
+                                <td className="px-4 py-3 text-center">
+                                  <span className="text-gray-500 hover:text-emerald-400 font-medium">Open ➔</span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+
+                          {/* Render Songs */}
+                          {currentSongs.map((f, idx) => {
                             const isChecked = selectedTracksList.includes(f.path);
                             return (
                               <tr 
@@ -896,17 +1013,17 @@ export default function Home() {
                                     className="w-3.5 h-3.5 rounded bg-[#12131a] border-gray-800 accent-emerald-500 cursor-pointer focus:ring-0" 
                                   />
                                 </td>
-                                <td className="px-4 py-3 font-semibold text-white truncate max-w-xs">{f.name}</td>
-                              <td className="px-4 py-3 text-center">
-                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${f.type === 'video' ? 'bg-purple-900/30 text-purple-400' : 'bg-blue-900/30 text-blue-400'}`}>{f.type.toUpperCase()}</span>
-                              </td>
-                              <td className="px-4 py-3 text-right text-gray-400 font-mono">{fmtSize(f.size)}</td>
-                              <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
-                                <div className="flex items-center justify-center gap-2">
-                                  <button onClick={() => playFile(f)} className="text-emerald-400 hover:text-emerald-300 font-semibold">▶ Play</button>
-                                  <button onClick={() => deleteFile(f.name)} className="text-rose-400 hover:text-rose-350 font-semibold">🗑 Del</button>
-                                </div>
-                              </td>
+                                <td className="px-4 py-3 font-semibold text-white truncate max-w-xs">{f.name.split('/').pop()}</td>
+                                <td className="px-4 py-3 text-center">
+                                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${f.type === 'video' ? 'bg-purple-900/30 text-purple-400' : 'bg-blue-900/30 text-blue-400'}`}>{f.type.toUpperCase()}</span>
+                                </td>
+                                <td className="px-4 py-3 text-right text-gray-400 font-mono">{fmtSize(f.size)}</td>
+                                <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
+                                  <div className="flex items-center justify-center gap-2">
+                                    <button onClick={() => playFile(f)} className="text-emerald-400 hover:text-emerald-300 font-semibold">▶ Play</button>
+                                    <button onClick={() => deleteFile(f.name)} className="text-rose-400 hover:text-rose-350 font-semibold">🗑 Del</button>
+                                  </div>
+                                </td>
                               </tr>
                             );
                           })}

@@ -12,11 +12,12 @@ export interface UploadTask {
   status: UploadStatus;
   errorMessage?: string;
   abortController?: AbortController;
+  folder?: string;
 }
 
 interface UploadContextType {
   tasks: UploadTask[];
-  enqueueFiles: (files: File[]) => void;
+  enqueueFiles: (files: File[], folder?: string) => void;
   retryTask: (id: string) => void;
   cancelTask: (id: string) => void;
   dismissTask: (id: string) => void;
@@ -104,6 +105,9 @@ export function UploadProvider({ children }: { children: ReactNode }) {
 
     const formData = new FormData();
     formData.append('file', nextTask.file);
+    if (nextTask.folder) {
+      formData.append('folder', nextTask.folder);
+    }
 
     xhr.open('POST', '/api/media');
     xhr.send(formData);
@@ -112,7 +116,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     processQueue();
   }, []);
 
-  const enqueueFiles = useCallback((files: File[]) => {
+  const enqueueFiles = useCallback((files: File[], folder?: string) => {
     const approvedFiles: File[] = [];
     const rejectedTasks: UploadTask[] = [];
 
@@ -125,7 +129,8 @@ export function UploadProvider({ children }: { children: ReactNode }) {
           loadedBytes: 0,
           totalBytes: file.size,
           status: 'ERROR',
-          errorMessage: 'Invalid file type. Must be audio or video.'
+          errorMessage: 'Invalid file type. Must be audio or video.',
+          folder,
         });
         continue;
       }
@@ -138,7 +143,8 @@ export function UploadProvider({ children }: { children: ReactNode }) {
           loadedBytes: 0,
           totalBytes: file.size,
           status: 'ERROR',
-          errorMessage: 'File is empty.'
+          errorMessage: 'File is empty.',
+          folder,
         });
         continue;
       }
@@ -156,7 +162,8 @@ export function UploadProvider({ children }: { children: ReactNode }) {
             loadedBytes: 0,
             totalBytes: file.size,
             status: 'CANCELED',
-            errorMessage: 'User declined large file upload.'
+            errorMessage: 'User declined large file upload.',
+            folder,
           });
           continue;
         }
@@ -174,6 +181,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
         loadedBytes: 0,
         totalBytes: file.size,
         status: 'QUEUED' as UploadStatus,
+        folder,
       }))
     ];
 
