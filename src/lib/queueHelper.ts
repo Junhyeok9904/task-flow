@@ -48,3 +48,79 @@ export function insertAfterCurrent(
     newQueueIndex: newCurrentIndex
   };
 }
+
+/**
+ * Removes a track from the queue at a specific index.
+ * Adjusts the active queue index and returns control flags for playing next or stopping.
+ * 
+ * @param queue Current list of tracks in the queue
+ * @param queueIndex The index of the currently playing track
+ * @param indexToRemove The index of the track to remove from the queue
+ * @param repeatMode The active repeat mode ('none', 'all', 'one')
+ */
+export function removeTrackFromQueue(
+  queue: MediaFile[],
+  queueIndex: number,
+  indexToRemove: number,
+  repeatMode: 'none' | 'all' | 'one' = 'none'
+): {
+  newQueue: MediaFile[];
+  newQueueIndex: number;
+  shouldStop: boolean;
+  shouldPlayNext: boolean;
+} {
+  if (indexToRemove < 0 || indexToRemove >= queue.length) {
+    return {
+      newQueue: queue,
+      newQueueIndex: queueIndex,
+      shouldStop: false,
+      shouldPlayNext: false
+    };
+  }
+
+  if (queue.length === 1) {
+    return {
+      newQueue: [],
+      newQueueIndex: 0,
+      shouldStop: true,
+      shouldPlayNext: false
+    };
+  }
+
+  const newQueue = queue.filter((_, idx) => idx !== indexToRemove);
+  let newQueueIndex = queueIndex;
+  let shouldStop = false;
+  let shouldPlayNext = false;
+
+  if (indexToRemove === queueIndex) {
+    // Removing the currently playing track
+    if (indexToRemove === queue.length - 1) {
+      // Removing the last track in the queue
+      if (repeatMode === 'all') {
+        newQueueIndex = 0;
+        shouldPlayNext = true;
+      } else {
+        newQueueIndex = 0;
+        shouldStop = true;
+      }
+    } else {
+      // Removing a track in the middle of the queue
+      // The next track takes the same index
+      newQueueIndex = indexToRemove;
+      shouldPlayNext = true;
+    }
+  } else if (indexToRemove < queueIndex) {
+    // Removing a track before the currently playing track
+    newQueueIndex = queueIndex - 1;
+  } else {
+    // Removing a track after the currently playing track
+    newQueueIndex = queueIndex;
+  }
+
+  return {
+    newQueue,
+    newQueueIndex,
+    shouldStop,
+    shouldPlayNext
+  };
+}

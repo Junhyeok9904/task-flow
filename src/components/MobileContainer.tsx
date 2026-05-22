@@ -13,6 +13,111 @@ function fmtTime(s: number) {
   return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
 }
 
+interface QueueItemProps {
+  file: MediaFile;
+  idx: number;
+  isActive: boolean;
+  onRemove: (index: number) => void;
+  onPlay: (file: MediaFile) => void;
+  getGradient: (title: string) => string;
+}
+
+function QueueItem({ file, idx, isActive, onRemove, onPlay, getGradient }: QueueItemProps) {
+  const [startX, setStartX] = useState(0);
+  const [offsetX, setOffsetX] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setStartX(e.touches[0].clientX);
+    setIsSwiping(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isSwiping) return;
+    const currentX = e.touches[0].clientX;
+    const diff = currentX - startX;
+    if (diff < 0) {
+      setOffsetX(Math.max(diff, -100));
+    } else {
+      setOffsetX(0);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsSwiping(false);
+    if (offsetX < -70) {
+      setIsDeleting(true);
+      setOffsetX(-350);
+      setTimeout(() => {
+        onRemove(idx);
+      }, 200);
+    } else {
+      setOffsetX(0);
+    }
+  };
+
+  return (
+    <div 
+      className={`relative overflow-hidden rounded-xl border border-white/5 bg-[#0f1118]/80 transition-all duration-300 ${
+        isDeleting ? 'max-h-0 opacity-0 mb-0 py-0 border-0' : 'max-h-16 mb-2 py-0'
+      }`}
+    >
+      {/* Background Delete Action Reveal */}
+      <div 
+        className="absolute inset-y-0 right-0 bg-rose-600 flex items-center justify-end px-5 transition-all duration-200"
+        style={{ width: `${Math.abs(offsetX)}px`, opacity: offsetX < -15 ? 1 : 0 }}
+      >
+        <span className="text-white text-[10px] font-bold flex items-center gap-1 shrink-0">
+          🗑️ <span className={offsetX < -70 ? "scale-105 transition-transform" : ""}>삭제</span>
+        </span>
+      </div>
+
+      {/* Foreground Swipable Item */}
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onClick={() => onPlay(file)}
+        className={`flex items-center justify-between p-2.5 cursor-pointer select-none active:bg-white/5 ${
+          isActive ? 'bg-emerald-500/10 border-l-4 border-l-emerald-500' : ''
+        }`}
+        style={{
+          transform: `translateX(${offsetX}px)`,
+          transition: isSwiping ? 'none' : 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+        }}
+      >
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${getGradient(file.name)} flex items-center justify-center shrink-0 shadow overflow-hidden`}>
+            {file.coverArt ? (
+              <img src={file.coverArt} alt="Cover" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-xs text-white">💿</span>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className={`text-[10px] font-bold truncate pr-2 ${isActive ? 'text-emerald-400' : 'text-white'}`}>
+              {file.name.split('/').pop()}
+            </p>
+            <p className="text-[8px] text-gray-500 font-medium uppercase tracking-wider font-mono truncate">
+              {file.artist || 'Unknown Artist'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {isActive ? (
+            <span className="text-[8px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded-full border border-emerald-500/20">재생 중</span>
+          ) : (
+            <span className="text-[8px] text-gray-600 font-mono">#{idx + 1}</span>
+          )}
+          <div className="text-gray-600 select-none px-0.5 text-[10px]">☰</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MobileContainer() {
   const pathname = usePathname();
   const router = useRouter();
@@ -40,12 +145,14 @@ export function MobileContainer() {
     toggleRepeat,
     toast,
     showToast,
+    removeFromQueue,
   } = useAudioPlayer();
 
   // Mobile layout state
   const [isMobilePlayerOpen, setIsMobilePlayerOpen] = useState(false);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [isAddToPlaylistOpen, setIsAddToPlaylistOpen] = useState(false);
+  const [activeSubTab, setActiveSubTab] = useState<'nowplaying' | 'queue'>('nowplaying');
 
   // Fetch playlists for add-to-playlist bottom sheet
   const loadPlaylists = async () => {
@@ -240,32 +347,72 @@ export function MobileContainer() {
             >
               <span className="text-white text-base">▼</span>
             </button>
-            <div className="text-center">
-              <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest block">now playing</span>
-              <span className="text-xs font-bold text-white truncate max-w-[180px] block mt-0.5">
-                {currentFile.name.split('/').pop()}
-              </span>
+            <div className="flex bg-white/5 p-0.5 rounded-full border border-white/5 relative z-10">
+              <button
+                onClick={() => setActiveSubTab('nowplaying')}
+                className={`px-4 py-1.5 rounded-full text-[9px] font-bold tracking-widest transition-all duration-300 ${
+                  activeSubTab === 'nowplaying' ? 'bg-emerald-500 text-black shadow-lg font-black' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                NOW PLAYING
+              </button>
+              <button
+                onClick={() => setActiveSubTab('queue')}
+                className={`px-4 py-1.5 rounded-full text-[9px] font-bold tracking-widest transition-all duration-300 ${
+                  activeSubTab === 'queue' ? 'bg-emerald-500 text-black shadow-lg font-black' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                QUEUE ({queue.length})
+              </button>
             </div>
             <div className="w-10 h-10"></div> {/* Spacer for symmetry */}
           </header>
 
-          {/* Central Cover artwork */}
-          <div className="flex-1 flex items-center justify-center my-4 min-h-0 relative">
+          {/* Central Content Area (Now Playing Cover Art OR Queue List) */}
+          <div className="flex-1 flex flex-col items-center justify-center my-4 min-h-0 w-full relative">
             <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/10 via-indigo-500/5 to-purple-500/10 rounded-full blur-[100px] pointer-events-none"></div>
             
-            <div className={`aspect-square w-full max-w-[290px] rounded-3xl bg-gradient-to-br ${getGradientFromTitle(currentFile.name)} flex items-center justify-center shadow-[0_20px_50px_rgba(0,0,0,0.8)] border border-white/10 relative overflow-hidden transition-all duration-500 ${isPlaying ? 'scale-[1.03]' : 'scale-95 opacity-80'}`}>
-              {currentFile.coverArt ? (
-                <img src={currentFile.coverArt} alt="Cover" className="w-full h-full object-cover" />
-              ) : (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/35 backdrop-blur-sm">
-                  <div className={`w-32 h-32 rounded-full border-8 border-black/40 bg-gray-900/90 flex items-center justify-center shadow-2xl relative ${isPlaying ? 'animate-spin [animation-duration:15s]' : ''}`}>
-                    <div className="w-10 h-10 rounded-full bg-black/60 flex items-center justify-center">
-                      <span className="text-white text-lg">💿</span>
+            {activeSubTab === 'nowplaying' ? (
+              <div className={`aspect-square w-full max-w-[290px] rounded-3xl bg-gradient-to-br ${getGradientFromTitle(currentFile.name)} flex items-center justify-center shadow-[0_20px_50px_rgba(0,0,0,0.8)] border border-white/10 relative overflow-hidden transition-all duration-500 ${isPlaying ? 'scale-[1.03]' : 'scale-95 opacity-80'}`}>
+                {currentFile.coverArt ? (
+                  <img src={currentFile.coverArt} alt="Cover" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/35 backdrop-blur-sm">
+                    <div className={`w-32 h-32 rounded-full border-8 border-black/40 bg-gray-900/90 flex items-center justify-center shadow-2xl relative ${isPlaying ? 'animate-spin [animation-duration:15s]' : ''}`}>
+                      <div className="w-10 h-10 rounded-full bg-black/60 flex items-center justify-center">
+                        <span className="text-white text-lg">💿</span>
+                      </div>
                     </div>
                   </div>
+                )}
+              </div>
+            ) : (
+              <div className="w-full max-w-[340px] flex-1 flex flex-col min-h-0">
+                <div className="flex items-center justify-between mb-3 px-1 shrink-0">
+                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">플레이리스트 대기열</span>
+                  <span className="text-[10px] text-emerald-400 font-bold font-mono">{queueIndex + 1} / {queue.length}</span>
                 </div>
-              )}
-            </div>
+                <div className="flex-1 overflow-y-auto pr-1 select-none space-y-1">
+                  {queue.length > 0 ? (
+                    queue.map((file, idx) => (
+                      <QueueItem
+                        key={`${file.id || file.path}-${idx}`}
+                        file={file}
+                        idx={idx}
+                        isActive={idx === queueIndex}
+                        onRemove={removeFromQueue}
+                        onPlay={playFile}
+                        getGradient={getGradientFromTitle}
+                      />
+                    ))
+                  ) : (
+                    <div className="text-center py-20 shrink-0">
+                      <p className="text-xs text-gray-500">대기열이 비어 있습니다.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Bottom Control Area */}

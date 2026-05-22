@@ -1,7 +1,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { MediaFile } from '../types';
-import { insertAfterCurrent } from '../lib/queueHelper';
+import { insertAfterCurrent, removeTrackFromQueue } from '../lib/queueHelper';
 
 interface AudioContextType {
   currentFile: MediaFile | null;
@@ -34,6 +34,7 @@ interface AudioContextType {
   seekTo: (time: number) => void;
   getMediaEl: () => HTMLAudioElement | null;
   addToQueueNext: (file: MediaFile) => void;
+  removeFromQueue: (index: number) => void;
   toast: { message: string; type: 'success' | 'error' | 'warning' } | null;
   showToast: (message: string, type?: 'success' | 'error' | 'warning') => void;
 }
@@ -119,6 +120,44 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       return newQueue;
     });
   }, [currentFile, playFile]);
+
+  const removeFromQueue = useCallback((indexToRemove: number) => {
+    const { queue, queueIndex, repeatMode } = stateRef.current;
+    
+    const { newQueue, newQueueIndex, shouldStop, shouldPlayNext } = removeTrackFromQueue(
+      queue,
+      queueIndex,
+      indexToRemove,
+      repeatMode
+    );
+
+    setQueue(newQueue);
+    setQueueIndex(newQueueIndex);
+
+    const audio = getAudio();
+
+    if (shouldStop) {
+      setCurrentFile(null);
+      setIsPlaying(false);
+      if (audio) {
+        audio.pause();
+        audio.src = '';
+      }
+      showToast('대기열이 비어 재생을 중지합니다.', 'warning');
+    } else if (shouldPlayNext) {
+      const nextFile = newQueue[newQueueIndex];
+      setCurrentFile(nextFile);
+      setIsPlaying(true);
+      if (audio && nextFile) {
+        audio.src = nextFile.path;
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      }
+      showToast('현재 곡을 삭제하고 다음 곡을 재생합니다.', 'success');
+    } else {
+      showToast('대기열에서 제거되었습니다.', 'success');
+    }
+  }, [showToast]);
 
   // Use refs to avoid closure stale state in event listeners without re-binding
   const stateRef = useRef({ queue, queueIndex, repeatMode, isShuffle });
@@ -327,7 +366,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       repeatMode, setRepeatMode, isShuffle, setIsShuffle,
       toggleShuffle, toggleRepeat, playFile, playPlaylistRewrite,
       playPlaylistAppend, handlePrev, handleNext, togglePlay, seekBy, seekTo, getMediaEl: getAudio,
-      addToQueueNext, toast, showToast
+      addToQueueNext, removeFromQueue, toast, showToast
     }}>
       {children}
     </AudioContext.Provider>

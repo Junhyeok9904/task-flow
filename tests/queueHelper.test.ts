@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { insertAfterCurrent } from '../src/lib/queueHelper.ts';
+import { insertAfterCurrent, removeTrackFromQueue } from '../src/lib/queueHelper.ts';
 import type { MediaFile } from '../src/types/index.ts';
 
 // Helper to create mock MediaFile
@@ -108,5 +108,85 @@ describe('Queue Insertion Helper Tests', () => {
     assert.strictEqual(result.newQueue[2].path, fileB.path);
     assert.strictEqual(result.newQueue[3].path, fileC.path);
     assert.strictEqual(result.newQueueIndex, 1);
+  });
+
+  describe('Queue Deletion Helper Tests', () => {
+    test('6. Exception Case: Remove invalid index', () => {
+      const queue = [fileA, fileB, fileC];
+      const result = removeTrackFromQueue(queue, 1, 5); // Index 5 is invalid
+      assert.deepStrictEqual(result.newQueue, queue);
+      assert.strictEqual(result.newQueueIndex, 1);
+      assert.strictEqual(result.shouldStop, false);
+      assert.strictEqual(result.shouldPlayNext, false);
+    });
+
+    test('7. Boundary Case: Remove the only track in queue', () => {
+      const queue = [fileA];
+      const result = removeTrackFromQueue(queue, 0, 0);
+      assert.deepStrictEqual(result.newQueue, []);
+      assert.strictEqual(result.newQueueIndex, 0);
+      assert.strictEqual(result.shouldStop, true);
+      assert.strictEqual(result.shouldPlayNext, false);
+    });
+
+    test('8. Normal Case: Remove active track (middle of queue)', () => {
+      // Queue: A, B, C. B (index 1) is active. Removing B.
+      const queue = [fileA, fileB, fileC];
+      const result = removeTrackFromQueue(queue, 1, 1);
+      // Expected newQueue: [A, C], newQueueIndex: 1 (C becomes the active track), shouldPlayNext: true
+      assert.strictEqual(result.newQueue.length, 2);
+      assert.strictEqual(result.newQueue[0].path, fileA.path);
+      assert.strictEqual(result.newQueue[1].path, fileC.path);
+      assert.strictEqual(result.newQueueIndex, 1);
+      assert.strictEqual(result.shouldPlayNext, true);
+      assert.strictEqual(result.shouldStop, false);
+    });
+
+    test('9. Normal Case: Remove active track (end of queue, repeatMode=none)', () => {
+      // Queue: A, B, C. C (index 2) is active. Removing C.
+      const queue = [fileA, fileB, fileC];
+      const result = removeTrackFromQueue(queue, 2, 2, 'none');
+      // Expected newQueue: [A, B], shouldStop: true
+      assert.strictEqual(result.newQueue.length, 2);
+      assert.strictEqual(result.newQueueIndex, 0);
+      assert.strictEqual(result.shouldStop, true);
+      assert.strictEqual(result.shouldPlayNext, false);
+    });
+
+    test('10. Normal Case: Remove active track (end of queue, repeatMode=all)', () => {
+      // Queue: A, B, C. C (index 2) is active. Removing C.
+      const queue = [fileA, fileB, fileC];
+      const result = removeTrackFromQueue(queue, 2, 2, 'all');
+      // Expected newQueue: [A, B], newQueueIndex: 0 (A is next), shouldPlayNext: true
+      assert.strictEqual(result.newQueue.length, 2);
+      assert.strictEqual(result.newQueueIndex, 0);
+      assert.strictEqual(result.shouldPlayNext, true);
+      assert.strictEqual(result.shouldStop, false);
+    });
+
+    test('11. Normal Case: Remove track before active track', () => {
+      // Queue: A, B, C. B (index 1) is active. Removing A.
+      const queue = [fileA, fileB, fileC];
+      const result = removeTrackFromQueue(queue, 1, 0);
+      // Expected newQueue: [B, C], newQueueIndex: 0 (B's new position)
+      assert.strictEqual(result.newQueue.length, 2);
+      assert.strictEqual(result.newQueue[0].path, fileB.path);
+      assert.strictEqual(result.newQueueIndex, 0);
+      assert.strictEqual(result.shouldPlayNext, false);
+      assert.strictEqual(result.shouldStop, false);
+    });
+
+    test('12. Normal Case: Remove track after active track', () => {
+      // Queue: A, B, C. B (index 1) is active. Removing C.
+      const queue = [fileA, fileB, fileC];
+      const result = removeTrackFromQueue(queue, 1, 2);
+      // Expected newQueue: [A, B], newQueueIndex: 1 (B remains active)
+      assert.strictEqual(result.newQueue.length, 2);
+      assert.strictEqual(result.newQueue[0].path, fileA.path);
+      assert.strictEqual(result.newQueue[1].path, fileB.path);
+      assert.strictEqual(result.newQueueIndex, 1);
+      assert.strictEqual(result.shouldPlayNext, false);
+      assert.strictEqual(result.shouldStop, false);
+    });
   });
 });
