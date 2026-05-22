@@ -90,6 +90,17 @@ export default function Home() {
     trackName: string;
   } | null>(null);
 
+  // Custom dialog confirmation states
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    confirmText?: string;
+    cancelText?: string;
+    isDanger?: boolean;
+  } | null>(null);
+
   // Cloudflare Tunnel State
   const [tunnelUrl, setTunnelUrl] = useState<string | null>(null);
   const [isTunneling, setIsTunneling] = useState(false);
@@ -203,25 +214,34 @@ export default function Home() {
   }, [successCount]);
 
   const deleteFile = async (filename: string) => {
-    if (!confirm(`Are you sure you want to delete ${filename}?`)) return;
-    try {
-      const res = await fetch(`/api/media?filename=${encodeURIComponent(filename)}`, { method: 'DELETE' });
-      if (res.ok) {
-        if (currentFile && currentFile.name === filename) {
-          const el = getMediaEl();
-          if (el) el.pause();
-          setCurrentFile(null);
-          setIsPlaying(false);
-        }
-        if (selectedTrack && selectedTrack.name === filename) {
-          setSelectedTrack(null);
-        }
-        setQueue(prev => prev.filter(q => q.name !== filename));
-        await loadData();
-      } else {
-        alert('Failed to delete file');
+    setConfirmDialog({
+      isOpen: true,
+      title: '파일 삭제',
+      message: `'${filename}' 파일을 라이브러리에서 정말 삭제하시겠습니까?`,
+      confirmText: '삭제',
+      cancelText: '취소',
+      isDanger: true,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/media?filename=${encodeURIComponent(filename)}`, { method: 'DELETE' });
+          if (res.ok) {
+            if (currentFile && currentFile.name === filename) {
+              const el = getMediaEl();
+              if (el) el.pause();
+              setCurrentFile(null);
+              setIsPlaying(false);
+            }
+            if (selectedTrack && selectedTrack.name === filename) {
+              setSelectedTrack(null);
+            }
+            setQueue(prev => prev.filter(q => q.name !== filename));
+            await loadData();
+          } else {
+            alert('Failed to delete file');
+          }
+        } catch (e) { console.error(e); }
       }
-    } catch (e) { console.error(e); }
+    });
   };
 
   const deleteSelectedTracks = async () => {
@@ -233,40 +253,46 @@ export default function Home() {
 
     if (filenamesToDelete.length === 0) return;
 
-    if (!confirm(`Are you sure you want to delete ${filenamesToDelete.length} selected files?`)) return;
+    setConfirmDialog({
+      isOpen: true,
+      title: '선택 파일 삭제',
+      message: `선택한 ${filenamesToDelete.length}개의 파일을 정말 삭제하시겠습니까?`,
+      confirmText: '삭제',
+      cancelText: '취소',
+      isDanger: true,
+      onConfirm: async () => {
+        try {
+          const res = await fetch('/api/media', {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ filenames: filenamesToDelete })
+          });
 
-    try {
-      const res = await fetch('/api/media', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ filenames: filenamesToDelete })
-      });
-
-      if (res.ok) {
-        if (currentFile && filenamesToDelete.includes(currentFile.name)) {
-          const el = getMediaEl();
-          if (el) el.pause();
-          setCurrentFile(null);
-          setIsPlaying(false);
+          if (res.ok) {
+            if (currentFile && filenamesToDelete.includes(currentFile.name)) {
+              const el = getMediaEl();
+              if (el) el.pause();
+              setCurrentFile(null);
+              setIsPlaying(false);
+            }
+            if (selectedTrack && filenamesToDelete.includes(selectedTrack.name)) {
+              setSelectedTrack(null);
+            }
+            setQueue(prev => prev.filter(q => !filenamesToDelete.includes(q.name)));
+            setSelectedTracksList([]);
+            await loadData();
+            alert('Selected files deleted successfully');
+          } else {
+            alert('Failed to delete selected files');
+          }
+        } catch (e) {
+          console.error(e);
         }
-        if (selectedTrack && filenamesToDelete.includes(selectedTrack.name)) {
-          setSelectedTrack(null);
-        }
-        setQueue(prev => prev.filter(q => !filenamesToDelete.includes(q.name)));
-        setSelectedTracksList([]);
-        await loadData();
-        alert('Selected files deleted successfully');
-      } else {
-        alert('Failed to delete selected files');
       }
-    } catch (e) {
-      console.error(e);
-    }
+    });
   };
-
-
 
   const createPlaylist = async () => {
     if (!newPlaylistName.trim()) return;
@@ -280,14 +306,24 @@ export default function Home() {
   };
 
   const deletePlaylist = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this playlist?')) return;
-    await fetch('/api/playlists', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'delete', id })
+    const playlistName = playlists.find(p => p.id === id)?.name || '';
+    setConfirmDialog({
+      isOpen: true,
+      title: '플레이리스트 삭제',
+      message: `'${playlistName}' 플레이리스트를 삭제하시겠습니까?`,
+      confirmText: '삭제',
+      cancelText: '취소',
+      isDanger: true,
+      onConfirm: async () => {
+        await fetch('/api/playlists', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete', id })
+        });
+        if (selectedPlaylistId === id) setSelectedPlaylistId(null);
+        await loadData();
+      }
     });
-    if (selectedPlaylistId === id) setSelectedPlaylistId(null);
-    await loadData();
   };
 
   // Add items with duplicate checks
@@ -1366,6 +1402,40 @@ export default function Home() {
             >
               Cancel
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL: Custom Confirm Dialog ─── */}
+      {confirmDialog?.isOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className={`bg-[#0a0a0d]/90 backdrop-blur-3xl border ${confirmDialog.isDanger ? 'border-rose-500/20 shadow-[0_0_50px_rgba(244,63,94,0.15)]' : 'border-emerald-500/20 shadow-[0_0_50px_rgba(16,185,129,0.15)]'} rounded-3xl w-full max-w-sm p-8 space-y-6`}>
+            <div className="text-center">
+              <span className="text-4xl">{confirmDialog.isDanger ? '🚨' : '❓'}</span>
+              <h3 className="text-sm font-bold text-white mt-2">{confirmDialog.title}</h3>
+              <p className="text-xs text-gray-400 mt-2 max-w-[280px] mx-auto break-all leading-relaxed">
+                {confirmDialog.message}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setConfirmDialog(null);
+                }}
+                className="flex-1 py-2.5 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl border border-white/5 transition text-xs font-bold"
+              >
+                {confirmDialog.cancelText || 'Cancel'}
+              </button>
+              <button
+                onClick={() => {
+                  confirmDialog.onConfirm();
+                  setConfirmDialog(null);
+                }}
+                className={`flex-1 py-2.5 ${confirmDialog.isDanger ? 'bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border-rose-500/30 hover:border-rose-500/60' : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border-emerald-500/30 hover:border-emerald-500/60'} rounded-xl border transition text-xs font-bold`}
+              >
+                {confirmDialog.confirmText || 'Confirm'}
+              </button>
+            </div>
           </div>
         </div>
       )}
