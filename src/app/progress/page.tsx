@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useAudioPlayer } from '../../contexts/AudioProvider';
 import { MediaFile, Task, TaskStatus } from '../../types';
 import { ProgressSkeleton, ErrorState, EmptyState } from '../../components/Skeletons';
+import { Icon } from '../../components/ui/Icon';
 import { usePointerDnd } from './usePointerDnd';
 
 function fmt(s: number) {
@@ -178,23 +179,23 @@ export default function ProgressPage() {
       <div className="max-w-7xl mx-auto space-y-6 p-6 relative z-10">
         
         {/* Top Header Section */}
-        <div className="flex items-center justify-between border-b border-gray-900 pb-5">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-bold text-white tracking-wide uppercase">📊 Dev Progress - 플레이리스트 제작 진척</h1>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-900 pb-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-base md:text-lg font-bold text-white tracking-wide uppercase">📊 Dev Progress - 플레이리스트 제작 진척</h1>
             <span className="text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold">
               Subpage Active
             </span>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full md:w-auto">
             <Link 
               href="/checklist" 
-              className="px-4 py-2 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-400 border border-blue-500/30 rounded-xl hover:from-blue-500 hover:to-cyan-400 hover:text-white font-bold text-xs transition duration-300 shadow-lg shadow-blue-500/5"
+              className="px-4 py-2 text-center bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-400 border border-blue-500/30 rounded-xl hover:from-blue-500 hover:to-cyan-400 hover:text-white font-bold text-xs transition duration-300 shadow-lg shadow-blue-500/5"
             >
               ✓ 데일리 체크리스트
             </Link>
             <Link 
               href="/" 
-              className="px-4 py-2 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl hover:from-emerald-500 hover:to-teal-400 hover:text-black font-bold text-xs transition duration-300 shadow-lg shadow-emerald-500/5"
+              className="px-4 py-2 text-center bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl hover:from-emerald-500 hover:to-teal-400 hover:text-black font-bold text-xs transition duration-300 shadow-lg shadow-emerald-500/5"
             >
               ← 플레이리스트로 돌아가기
             </Link>
@@ -421,7 +422,10 @@ export default function ProgressPage() {
                     onClick={() => playMedia(m)}
                     className={`p-3 rounded-xl border text-left text-xs transition duration-300 flex items-center justify-between ${isActive ? 'bg-[#1b2f28] text-emerald-400 border-emerald-500/40 shadow-lg shadow-emerald-500/5' : 'bg-[#181b24]/80 hover:bg-[#1c1e29] border-gray-900 text-gray-300'}`}
                   >
-                    <span className="truncate font-semibold max-w-[180px]">▶ {m.name || 'Audio'}</span>
+                    <span className="truncate font-semibold max-w-[180px] flex items-center gap-1">
+                      <Icon name="play" size={12} className={isActive ? "fill-emerald-400/20 text-emerald-400" : "text-gray-400"} />
+                      {m.name || 'Audio'}
+                    </span>
                     <span className="text-[9px] text-gray-500 uppercase tracking-widest font-bold">MP3</span>
                   </button>
                 );
@@ -464,7 +468,7 @@ export default function ProgressPage() {
 
       {/* ─── Persistent Glassmorphic Player bar ─── */}
       {currentFile && (
-        <div className="fixed bottom-0 left-0 right-0 h-16 bg-[#0f1118] border-t border-gray-900 flex items-center justify-between px-6 z-50 select-none shadow-2xl">
+        <div className="fixed bottom-0 left-0 right-0 h-16 bg-[#0f1118] border-t border-gray-900 hidden md:flex items-center justify-between px-6 z-50 select-none shadow-2xl">
           {/* Left details */}
           <div className="w-52 flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500 to-indigo-500 flex items-center justify-center shrink-0 shadow">
@@ -481,22 +485,45 @@ export default function ProgressPage() {
             <div className="flex items-center gap-4">
               <button
                 onClick={toggleShuffle}
-                className={`text-xs transition ${isShuffle ? 'text-emerald-400' : 'text-gray-500 hover:text-gray-400'}`}
+                className={`p-1.5 rounded-full transition-all ${isShuffle ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' : 'text-gray-500 hover:text-white'}`}
                 title="Shuffle"
               >
-                🔀
+                <Icon name="shuffle" size={16} />
               </button>
-              <button onClick={handlePrev} className="text-sm text-gray-400 hover:text-white transition">⏮</button>
-              <button onClick={togglePlay} className="w-8 h-8 bg-white text-gray-900 rounded-full flex items-center justify-center hover:scale-105 transition shadow">
-                {isPlaying ? '⏸' : '▶'}
+              <button 
+                onClick={handlePrev} 
+                className="p-1.5 text-gray-400 hover:text-white active:scale-90 transition-transform"
+                title="Previous Track"
+              >
+                <Icon name="skip-back" size={18} />
               </button>
-              <button onClick={() => handleNext(false)} className="text-sm text-gray-400 hover:text-white transition">⏭</button>
+              <button 
+                onClick={togglePlay} 
+                className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-black/60 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-[0.93] transition-all"
+                title={isPlaying ? "Pause" : "Play"}
+              >
+                <img 
+                  src={isPlaying ? "/images/premium_pause_icon.png" : "/images/premium_play_icon.png"} 
+                  alt={isPlaying ? "Pause" : "Play"} 
+                  className="w-full h-full object-cover scale-105"
+                />
+              </button>
+              <button 
+                onClick={() => handleNext(false)} 
+                className="p-1.5 text-gray-400 hover:text-white active:scale-90 transition-transform"
+                title="Next Track"
+              >
+                <Icon name="skip-forward" size={18} />
+              </button>
               <button
                 onClick={toggleRepeat}
-                className={`text-xs transition ${repeatMode !== 'none' ? 'text-emerald-400' : 'text-gray-500 hover:text-gray-400'}`}
+                className={`p-1.5 rounded-full relative transition-all ${repeatMode !== 'none' ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' : 'text-gray-500 hover:text-white'}`}
                 title={repeatMode === 'one' ? 'Repeat One' : repeatMode === 'all' ? 'Repeat All' : 'Repeat Off'}
               >
-                {repeatMode === 'one' ? '🔂' : '🔁'}
+                <Icon name="repeat" size={16} />
+                {repeatMode === 'one' && (
+                  <span className="absolute -top-1 -right-1 text-[7px] bg-emerald-500 text-black px-1 py-0.2 rounded-full font-black scale-90">1</span>
+                )}
               </button>
             </div>
 

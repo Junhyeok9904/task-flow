@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { MediaFile, Playlist } from '../types';
 import Link from 'next/link';
 import { useUpload } from '../components/UploadManager';
@@ -46,7 +47,461 @@ function getGradientFromTitle(title: string) {
   return gradients[hash % gradients.length];
 }
 
-export default function Home() {
+function useSwipeToQueue(track: MediaFile, onSwipeSuccess: () => void) {
+  const [translateX, setTranslateX] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const startXRef = useRef(0);
+  const startYRef = useRef(0);
+  const translateXRef = useRef(0);
+  const touchStartedRef = useRef(false);
+  const horizontalLockRef = useRef(false);
+
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    startXRef.current = touch.clientX;
+    startYRef.current = touch.clientY;
+    touchStartedRef.current = true;
+    horizontalLockRef.current = false;
+    translateXRef.current = 0;
+    setTranslateX(0);
+  }, []);
+
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!touchStartedRef.current) return;
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - startXRef.current;
+    const deltaY = touch.clientY - startYRef.current;
+
+    if (deltaX < 0) {
+      translateXRef.current = 0;
+      setTranslateX(0);
+      return;
+    }
+
+    if (!horizontalLockRef.current) {
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
+        horizontalLockRef.current = true;
+        setIsSwiping(true);
+      }
+    }
+
+    if (horizontalLockRef.current) {
+      if (e.cancelable) e.preventDefault();
+      const dragDistance = deltaX > 150 ? 150 + (deltaX - 150) * 0.25 : deltaX;
+      translateXRef.current = dragDistance;
+      setTranslateX(dragDistance);
+    }
+  }, []);
+
+  const onTouchEnd = useCallback(() => {
+    if (!touchStartedRef.current) return;
+    touchStartedRef.current = false;
+
+    if (horizontalLockRef.current) {
+      if (translateXRef.current > 80) {
+        onSwipeSuccess();
+      }
+    }
+
+    setIsSwiping(false);
+    translateXRef.current = 0;
+    setTranslateX(0);
+    horizontalLockRef.current = false;
+  }, [onSwipeSuccess]);
+
+  return {
+    translateX,
+    isSwiping,
+    touchHandlers: {
+      onTouchStart,
+      onTouchMove,
+      onTouchEnd,
+      onTouchCancel: onTouchEnd,
+    }
+  };
+}
+
+interface GridSongCardProps {
+  f: MediaFile;
+  isSelected: boolean;
+  isPlayingFile: boolean;
+  isChecked: boolean;
+  onSelect: () => void;
+  onToggleCheck: () => void;
+  onPlay: () => void;
+  onMenuClick: (e: React.MouseEvent, track: MediaFile) => void;
+  addToQueueNext: (file: MediaFile) => void;
+  showToast: (msg: string) => void;
+}
+
+function GridSongCard({
+  f,
+  isSelected,
+  isPlayingFile,
+  isChecked,
+  onSelect,
+  onToggleCheck,
+  onPlay,
+  onMenuClick,
+  addToQueueNext,
+  showToast
+}: GridSongCardProps) {
+  const { translateX, isSwiping, touchHandlers } = useSwipeToQueue(f, () => {
+    addToQueueNext(f);
+    showToast(`'${f.name.split('/').pop()}'이(가) 대기열에 추가되었습니다.`);
+  });
+
+  const waveform = getMockWaveform(f.name);
+
+  return (
+    <div 
+      className="relative overflow-hidden rounded-2xl border border-gray-900 bg-[#13161f]/80 cursor-pointer"
+      onClick={onSelect}
+    >
+      {/* Green reveal swipe background */}
+      <div 
+        className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-teal-600 flex items-center pl-6 text-white font-bold text-xs pointer-events-none rounded-2xl transition-opacity duration-150"
+        style={{ opacity: translateX > 10 ? 1 : 0 }}
+      >
+        <span className="flex items-center gap-1.5 animate-pulse">
+          ➕ 대기열에 추가됨
+        </span>
+      </div>
+
+      {/* Slidable front content */}
+      <div
+        {...touchHandlers}
+        style={{
+          transform: `translateX(${translateX}px)`,
+          transition: isSwiping ? 'none' : 'transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+        }}
+        className={`w-full h-full p-4 transition-all duration-300 hover:bg-[#161a25]/90 ${isSelected ? 'border-r-4 border-emerald-500/80' : ''}`}
+      >
+        {/* Multi-select check on the card */}
+        <div className="absolute top-4 right-4 z-10" onClick={e => e.stopPropagation()}>
+          <input 
+            type="checkbox" 
+            checked={isChecked} 
+            onChange={onToggleCheck} 
+            className="w-3.5 h-3.5 rounded bg-[#12131a] border-gray-800 accent-emerald-500 cursor-pointer focus:ring-0" 
+          />
+        </div>
+
+        {/* Top part: Cover thumbnail, Title, artist, ellipsis */}
+        <div className="flex gap-3 items-center">
+          <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${getGradientFromTitle(f.name)} flex items-center justify-center shadow-md relative overflow-hidden shrink-0`}>
+            {f.coverArt ? (
+              <img src={f.coverArt} alt="Cover" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-lg text-white drop-shadow-md">{f.type === 'video' ? '🎬' : '🎵'}</span>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-bold text-xs text-white truncate pr-4" title={f.name}>
+              {f.name.split('/').pop()}
+            </h3>
+            <span className="text-[10px] text-gray-500 truncate block w-full">{f.artist || 'Unknown Artist'}</span>
+          </div>
+          <button 
+            onClick={(e) => onMenuClick(e, f)}
+            className="text-gray-500 hover:text-white p-1 text-sm self-start mt-0.5 active:scale-90 transition-transform"
+          >
+            ︙
+          </button>
+        </div>
+
+        {/* Center Part: Waveform & Play button overlay */}
+        <div className="flex items-center gap-3 mt-4">
+          {/* Round green floating play button */}
+          <button
+            onClick={(e) => { e.stopPropagation(); onPlay(); }}
+            className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shadow transition-all duration-300 scale-95 hover:scale-100 active:scale-90 bg-black/40 border border-white/10"
+          >
+            <img 
+              src={isPlayingFile ? "/images/premium_pause_icon.png" : "/images/premium_play_icon.png"} 
+              alt={isPlayingFile ? "Pause" : "Play"} 
+              className="w-full h-full object-cover scale-110"
+            />
+          </button>
+
+          {/* Audio Waveform layout */}
+          <div className="flex-1 flex items-end justify-between h-7 gap-[2px] opacity-75">
+            {waveform.map((h, idx) => (
+              <div
+                key={idx}
+                className={`w-[2px] rounded-full transition-all duration-300 ${isPlayingFile ? 'bg-emerald-400 animate-pulse' : 'bg-gray-700'}`}
+                style={{ 
+                  height: `${h}%`, 
+                  animationDelay: `${idx * 40}ms`,
+                  animationDuration: '800ms'
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Bottom metadata tags */}
+        <div className="flex gap-1.5 mt-4 text-[8px] font-bold uppercase tracking-wider">
+          <span className="px-2 py-0.5 rounded-full bg-[#1c2e28] text-emerald-400 border border-emerald-500/20">Genre</span>
+          <span className="px-2 py-0.5 rounded-full bg-[#2e1c28] text-pink-400 border border-pink-500/20">Artist</span>
+          <span className="px-2 py-0.5 rounded-full bg-[#1c242e] text-blue-400 border border-blue-500/20">Year</span>
+          <span className="px-2 py-0.5 rounded-full bg-[#2e261c] text-amber-400 border border-amber-500/20">BPM</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ListSongRowProps {
+  f: MediaFile;
+  isSelected: boolean;
+  isPlayingFile: boolean;
+  isChecked: boolean;
+  onSelect: () => void;
+  onToggleCheck: () => void;
+  onPlay: () => void;
+  onDelete: () => void;
+  onMenuClick: (e: React.MouseEvent, track: MediaFile) => void;
+  addToQueueNext: (file: MediaFile) => void;
+  showToast: (msg: string) => void;
+}
+
+function ListSongRow({
+  f,
+  isSelected,
+  isPlayingFile,
+  isChecked,
+  onSelect,
+  onToggleCheck,
+  onPlay,
+  onDelete,
+  onMenuClick,
+  addToQueueNext,
+  showToast
+}: ListSongRowProps) {
+  const { translateX, isSwiping, touchHandlers } = useSwipeToQueue(f, () => {
+    addToQueueNext(f);
+    showToast(`'${f.name.split('/').pop()}'이(가) 대기열에 추가되었습니다.`);
+  });
+
+  return (
+    <tr 
+      onClick={onSelect} 
+      className={`border-b border-gray-900/40 hover:bg-[#181b24]/50 cursor-pointer transition relative ${isSelected ? 'bg-emerald-500/5' : ''}`}
+    >
+      <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
+        <input 
+          type="checkbox" 
+          checked={isChecked} 
+          onChange={onToggleCheck} 
+          className="w-3.5 h-3.5 rounded bg-[#12131a] border-gray-800 accent-emerald-500 cursor-pointer focus:ring-0" 
+        />
+      </td>
+      
+      {/* Sliding content table cell */}
+      <td className="px-4 py-3 relative overflow-hidden" {...touchHandlers}>
+        {/* Swipe green overlay */}
+        <div 
+          className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-teal-600 flex items-center pl-6 text-white font-bold text-[10px] pointer-events-none transition-opacity duration-150"
+          style={{ opacity: translateX > 10 ? 1 : 0 }}
+        >
+          <span className="flex items-center gap-1.5 animate-pulse">
+            ➕ 대기열에 추가됨
+          </span>
+        </div>
+        
+        <div 
+          style={{
+            transform: `translateX(${translateX}px)`,
+            transition: isSwiping ? 'none' : 'transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+          }}
+          className="font-semibold text-white truncate max-w-xs"
+        >
+          {f.name.split('/').pop()}
+        </div>
+      </td>
+
+      <td className="px-4 py-3 text-center hidden sm:table-cell">
+        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${f.type === 'video' ? 'bg-purple-900/30 text-purple-400' : 'bg-blue-900/30 text-blue-400'}`}>{f.type.toUpperCase()}</span>
+      </td>
+      
+      <td className="px-4 py-3 text-right text-gray-400 font-mono hidden sm:table-cell">{fmtSize(f.size)}</td>
+      
+      <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-center gap-3">
+          <button onClick={onPlay} className="text-emerald-400 hover:text-emerald-355 font-semibold flex items-center gap-1">
+            <Icon name="play" size={14} className="fill-emerald-400/20" /> Play
+          </button>
+          <button onClick={onDelete} className="text-rose-400 hover:text-rose-350 font-semibold flex items-center gap-1">
+            <Icon name="trash" size={14} /> Del
+          </button>
+          <button 
+            onClick={(e) => onMenuClick(e, f)}
+            className="text-gray-500 hover:text-white p-1 text-sm active:scale-90 transition-transform"
+          >
+            ︙
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+interface PlaylistTrackItemProps {
+  item: MediaFile;
+  onPlay: () => void;
+  onMenuClick: (e: React.MouseEvent, track: MediaFile) => void;
+  addToQueueNext: (file: MediaFile) => void;
+  showToast: (msg: string) => void;
+}
+
+function PlaylistTrackItem({
+  item,
+  onPlay,
+  onMenuClick,
+  addToQueueNext,
+  showToast
+}: PlaylistTrackItemProps) {
+  const { translateX, isSwiping, touchHandlers } = useSwipeToQueue(item, () => {
+    addToQueueNext(item);
+    showToast(`'${item.name.split('/').pop()}'이(가) 대기열에 추가되었습니다.`);
+  });
+
+  return (
+    <div className="relative overflow-hidden rounded border border-gray-900/60 bg-[#08090d]/60">
+      {/* Green swipe reveal */}
+      <div 
+        className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-teal-600 flex items-center pl-6 text-white font-bold text-[10px] pointer-events-none transition-opacity duration-150"
+        style={{ opacity: translateX > 10 ? 1 : 0 }}
+      >
+        <span className="flex items-center gap-1.5 animate-pulse">
+          ➕ 대기열에 추가됨
+        </span>
+      </div>
+
+      <div
+        {...touchHandlers}
+        style={{
+          transform: `translateX(${translateX}px)`,
+          transition: isSwiping ? 'none' : 'transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+        }}
+        className="flex items-center justify-between p-2 relative z-10 bg-[#08090d]/90 hover:bg-[#13161f] transition-all"
+      >
+        <span className="text-xs truncate max-w-[120px] text-gray-300">{item.name.split('/').pop()}</span>
+        <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+          <button onClick={onPlay} className="text-emerald-400 hover:text-emerald-355 transition flex items-center justify-center p-1" title="Play">
+            <Icon name="play" size={12} className="fill-emerald-400/20" />
+          </button>
+          <button 
+            onClick={(e) => onMenuClick(e, item)}
+            className="text-gray-500 hover:text-white transition flex items-center justify-center p-1"
+          >
+            ︙
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface FloatingContextMenuProps {
+  track: MediaFile;
+  x: number;
+  y: number;
+  playlists: Playlist[];
+  onClose: () => void;
+  addToQueueNext: (file: MediaFile) => void;
+  showToast: (msg: string) => void;
+  deleteFile: (filename: string) => void;
+  onAddTrackToPlaylist: (playlistId: string, playlistName: string, track: MediaFile) => void;
+}
+
+function FloatingContextMenu({
+  track,
+  x,
+  y,
+  playlists,
+  onClose,
+  addToQueueNext,
+  showToast,
+  deleteFile,
+  onAddTrackToPlaylist
+}: FloatingContextMenuProps) {
+  const [showPlaylistSubmenu, setShowPlaylistSubmenu] = useState(false);
+
+  return (
+    <div 
+      className="fixed bg-[#10121a]/95 border border-gray-800 rounded-2xl shadow-2xl p-1.5 z-[9999] w-48 text-xs font-semibold backdrop-blur-2xl animate-fade-in animate-duration-150"
+      style={{ 
+        top: `${y}px`, 
+        left: `${Math.min(x, typeof window !== 'undefined' ? window.innerWidth - 200 : x)}px` 
+      }}
+      onClick={e => e.stopPropagation()}
+    >
+      <div className="px-2.5 py-1.5 border-b border-white/5 text-[9px] text-gray-500 font-bold uppercase tracking-wider truncate">
+        {track.name.split('/').pop()}
+      </div>
+
+      <div className="space-y-0.5 pt-1">
+        <button
+          onClick={() => {
+            addToQueueNext(track);
+            showToast(`'${track.name.split('/').pop()}'이(가) 대기열에 추가되었습니다.`);
+            onClose();
+          }}
+          className="w-full flex items-center gap-2 px-2.5 py-2 hover:bg-[#181b24] hover:text-emerald-400 text-gray-300 rounded-lg transition text-left"
+        >
+          <span>➕</span> 대기열에 추가하기
+        </button>
+
+        <div className="relative">
+          <button
+            onMouseEnter={() => setShowPlaylistSubmenu(true)}
+            onClick={() => setShowPlaylistSubmenu(!showPlaylistSubmenu)}
+            className={`w-full flex items-center justify-between px-2.5 py-2 hover:bg-[#181b24] text-gray-300 rounded-lg transition text-left ${showPlaylistSubmenu ? 'bg-[#181b24] text-white' : ''}`}
+          >
+            <span className="flex items-center gap-2"><span>💿</span> 플레이리스트에 추가</span>
+            <span>▶</span>
+          </button>
+
+          {/* Submenu for Playlists selection */}
+          {showPlaylistSubmenu && (
+            <div className="absolute left-full top-0 ml-1 bg-[#10121a]/98 border border-gray-800 rounded-2xl shadow-2xl p-1.5 w-44 space-y-0.5 max-h-40 overflow-y-auto">
+              {playlists.length > 0 ? (
+                playlists.map(pl => (
+                  <button
+                    key={pl.id}
+                    onClick={() => {
+                      onAddTrackToPlaylist(pl.id, pl.name, track);
+                      onClose();
+                    }}
+                    className="w-full px-2 py-1.5 hover:bg-emerald-500/10 hover:text-emerald-400 text-gray-300 rounded-lg transition text-left truncate block"
+                  >
+                    {pl.name}
+                  </button>
+                ))
+              ) : (
+                <div className="text-[10px] text-gray-500 px-2 py-1 text-center">플레이리스트 없음</div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={() => {
+            deleteFile(track.name);
+            onClose();
+          }}
+          className="w-full flex items-center gap-2 px-2.5 py-2 hover:bg-rose-500/10 hover:text-rose-400 text-gray-405 rounded-lg transition text-left"
+        >
+          <span>🗑️</span> 삭제
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function HomeContent() {
   const { enqueueFiles, tasks } = useUpload();
   const [mounted, setMounted] = useState(false);
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
@@ -56,13 +511,47 @@ export default function Home() {
   const [search, setSearch] = useState('');
   const [view, setView] = useState<'songs' | 'playlists' | 'upload' | 'recent'>('songs');
   
+  const searchParams = useSearchParams();
+  const queryView = searchParams.get('view');
+
+  useEffect(() => {
+    if (queryView && ['songs', 'playlists', 'upload', 'recent'].includes(queryView)) {
+      setView(queryView as any);
+    } else if (!queryView) {
+      setView('songs');
+    }
+  }, [queryView]);
+  
   const {
     currentFile, setCurrentFile, isPlaying, setIsPlaying, currentTime, setCurrentTime,
     duration, setDuration, volume, setVolume, queue, setQueue, queueIndex, setQueueIndex,
     repeatMode, setRepeatMode, isShuffle, setIsShuffle, getMediaEl,
     playPlaylistRewrite, playPlaylistAppend, handlePrev, handleNext, playFile, togglePlay,
-    seekBy, toggleShuffle, toggleRepeat
+    seekBy, toggleShuffle, toggleRepeat, addToQueueNext, showToast
   } = useAudioPlayer();
+
+  // Floating Context Menu state and effect for dismissing it
+  const [contextMenu, setContextMenu] = useState<{ track: MediaFile; x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const handleClose = () => setContextMenu(null);
+    window.addEventListener('click', handleClose);
+    window.addEventListener('scroll', handleClose, true);
+    return () => {
+      window.removeEventListener('click', handleClose);
+      window.removeEventListener('scroll', handleClose, true);
+    };
+  }, []);
+
+  const handleMenuClick = (e: React.MouseEvent, track: MediaFile) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setContextMenu({
+      track,
+      x: e.clientX,
+      y: e.clientY
+    });
+  };
 
   // High-Fidelity UI states matching Dribbble mockup
   const [layoutMode, setLayoutMode] = useState<'grid' | 'list'>('grid');
@@ -515,7 +1004,7 @@ export default function Home() {
       <div className="flex flex-1 overflow-hidden relative">
         
         {/* PANEL 0: Vertical App Utility strip */}
-        <aside className="w-16 bg-black/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-6 justify-between shrink-0 shadow-[4px_0_24px_rgba(0,0,0,0.5)] z-20">
+        <aside className="hidden md:flex w-16 bg-black/40 backdrop-blur-2xl border-r border-white/5 flex-col items-center py-6 justify-between shrink-0 shadow-[4px_0_24px_rgba(0,0,0,0.5)] z-20">
           <div className="flex flex-col items-center gap-6 w-full">
             {/* Spotify / Circular glowing wave logo */}
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-500 to-green-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 animate-pulse">
@@ -554,7 +1043,7 @@ export default function Home() {
         </aside>
 
         {/* PANEL 1: Left Playlist Explorer Sidebar */}
-        <aside className="w-64 bg-[#0a0b10]/60 backdrop-blur-xl border-r border-white/5 flex flex-col shrink-0 z-10 shadow-[4px_0_24px_rgba(0,0,0,0.3)]">
+        <aside className="hidden md:flex w-64 bg-[#0a0b10]/60 backdrop-blur-xl border-r border-white/5 flex-col shrink-0 z-10 shadow-[4px_0_24px_rgba(0,0,0,0.3)]">
           <div className="p-6 border-b border-white/5">
             <h1 className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
               <Icon name="library" size={14} /> Playlist Explorer
@@ -754,25 +1243,25 @@ export default function Home() {
           </header>
 
           {/* Subheader: Horizontal filters tags from visual mockup */}
-          <div className="px-6 py-2.5 border-b border-gray-900 bg-[#0b0c10]/10 flex items-center justify-between shrink-0 z-10">
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Tags</span>
-              <div className="flex gap-2">
+          <div className="px-4 md:px-6 py-2.5 border-b border-gray-900 bg-[#0b0c10]/10 flex items-center justify-between shrink-0 z-10 gap-2">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <span className="text-[10px] text-gray-500 uppercase tracking-widest font-bold shrink-0">Tags</span>
+              <div className="flex gap-2 overflow-x-auto pb-0.5 whitespace-nowrap scrollbar-none flex-nowrap min-w-0 flex-1">
                 <button 
                   onClick={() => setActiveGenreTag('Ambient Electronica')} 
-                  className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-wide transition-all border ${activeGenreTag === 'Ambient Electronica' ? 'bg-[#1b2f28] text-emerald-400 border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.1)]' : 'bg-[#12131a] text-gray-400 border-transparent hover:bg-[#181b24]'}`}
+                  className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-wide transition-all border shrink-0 ${activeGenreTag === 'Ambient Electronica' ? 'bg-[#1b2f28] text-emerald-400 border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.1)]' : 'bg-[#12131a] text-gray-400 border-transparent hover:bg-[#181b24]'}`}
                 >
                   Ambient Electronica
                 </button>
                 <button 
                   onClick={() => setActiveGenreTag('Synthwave Hits')} 
-                  className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-wide transition-all border ${activeGenreTag === 'Synthwave Hits' ? 'bg-[#1b2f28] text-emerald-400 border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.1)]' : 'bg-[#12131a] text-gray-400 border-transparent hover:bg-[#181b24]'}`}
+                  className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-wide transition-all border shrink-0 ${activeGenreTag === 'Synthwave Hits' ? 'bg-[#1b2f28] text-emerald-400 border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.1)]' : 'bg-[#12131a] text-gray-400 border-transparent hover:bg-[#181b24]'}`}
                 >
                   Synthwave Hits
                 </button>
                 <button 
                   onClick={() => setActiveGenreTag('80s Retro')} 
-                  className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-wide transition-all border ${activeGenreTag === '80s Retro' ? 'bg-[#1b2f28] text-emerald-400 border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.1)]' : 'bg-[#12131a] text-gray-400 border-transparent hover:bg-[#181b24]'}`}
+                  className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-wide transition-all border shrink-0 ${activeGenreTag === '80s Retro' ? 'bg-[#1b2f28] text-emerald-400 border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.1)]' : 'bg-[#12131a] text-gray-400 border-transparent hover:bg-[#181b24]'}`}
                 >
                   80s Retro
                 </button>
@@ -780,7 +1269,7 @@ export default function Home() {
             </div>
 
             {/* Mock filter dropdowns from Dribbble UI */}
-            <div className="flex gap-2 text-[10px] font-semibold text-gray-400">
+            <div className="hidden sm:flex gap-2 text-[10px] font-semibold text-gray-400">
               <div className="px-2 py-1 bg-[#12131a] hover:bg-[#181b24] border border-gray-800 rounded-lg cursor-pointer transition">
                 Tags ∨
               </div>
@@ -900,76 +1389,21 @@ export default function Home() {
                       const isSelected = selectedTrack?.path === f.path;
                       const isPlayingFile = isPlaying && currentFile?.path === f.path;
                       const isChecked = selectedTracksList.includes(f.path);
-                      const waveform = getMockWaveform(f.name);
                       
                       return (
-                        <div
+                        <GridSongCard
                           key={f.path}
-                          onClick={() => setSelectedTrack(f)}
-                          className={`group relative bg-[#13161f]/80 rounded-2xl p-4 border transition-all duration-300 hover:bg-[#161a25]/90 hover:-translate-y-0.5 ${isSelected ? 'border-emerald-500/80 shadow-[0_0_15px_rgba(16,185,129,0.12)]' : 'border-gray-900'}`}
-                        >
-                          {/* Multi-select check on the card */}
-                          <div className="absolute top-4 right-4 z-10" onClick={e => e.stopPropagation()}>
-                            <input 
-                              type="checkbox" 
-                              checked={isChecked} 
-                              onChange={() => toggleSelectTrack(f.path)} 
-                              className="w-3.5 h-3.5 rounded bg-[#12131a] border-gray-800 accent-emerald-500 cursor-pointer focus:ring-0" 
-                            />
-                          </div>
-
-                          {/* Top part: Cover thumbnail, Title, artist, ellipsis */}
-                          <div className="flex gap-3 items-center">
-                            <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${getGradientFromTitle(f.name)} flex items-center justify-center shadow-md relative overflow-hidden shrink-0`}>
-                              {f.coverArt ? (
-                                <img src={f.coverArt} alt="Cover" className="w-full h-full object-cover" />
-                              ) : (
-                                <span className="text-lg text-white drop-shadow-md">{f.type === 'video' ? '🎬' : '🎵'}</span>
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <h3 className="font-bold text-xs text-white truncate pr-4" title={f.name}>
-                                {f.name.split('/').pop()}
-                              </h3>
-                              <span className="text-[10px] text-gray-500 truncate block w-full">{f.artist || 'Unknown Artist'}</span>
-                            </div>
-                            <button className="text-gray-600 hover:text-gray-300 text-xs self-start mt-1">︙</button>
-                          </div>
-
-                          {/* Center Part: Waveform & Play button overlay */}
-                          <div className="flex items-center gap-3 mt-4">
-                            {/* Round green floating play button */}
-                            <button
-                              onClick={(e) => { e.stopPropagation(); playFile(f); }}
-                              className={`w-8 h-8 rounded-full flex items-center justify-center shadow transition-all duration-300 scale-95 group-hover:scale-100 ${isPlayingFile ? 'bg-emerald-500 text-black' : 'bg-[#181b24] text-white hover:bg-emerald-500 hover:text-black'}`}
-                            >
-                              <span className="text-sm font-semibold">{isPlayingFile ? '⏸' : '▶'}</span>
-                            </button>
-
-                            {/* Audio Waveform layout matching design mockup exactly */}
-                            <div className="flex-1 flex items-end justify-between h-7 gap-[2px] opacity-75">
-                              {waveform.map((h, idx) => (
-                                <div
-                                  key={idx}
-                                  className={`w-[2px] rounded-full transition-all duration-300 ${isPlayingFile ? 'bg-emerald-400 animate-pulse' : 'bg-gray-700'}`}
-                                  style={{ 
-                                    height: `${h}%`, 
-                                    animationDelay: `${idx * 40}ms`,
-                                    animationDuration: '800ms'
-                                  }}
-                                />
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Bottom metadata tags matching the color pills in mockup */}
-                          <div className="flex gap-1.5 mt-4 text-[8px] font-bold uppercase tracking-wider">
-                            <span className="px-2 py-0.5 rounded-full bg-[#1c2e28] text-emerald-400 border border-emerald-500/20">Genre</span>
-                            <span className="px-2 py-0.5 rounded-full bg-[#2e1c28] text-pink-400 border border-pink-500/20">Artist</span>
-                            <span className="px-2 py-0.5 rounded-full bg-[#1c242e] text-blue-400 border border-blue-500/20">Year</span>
-                            <span className="px-2 py-0.5 rounded-full bg-[#2e261c] text-amber-400 border border-amber-500/20">BPM</span>
-                          </div>
-                        </div>
+                          f={f}
+                          isSelected={isSelected}
+                          isPlayingFile={isPlayingFile}
+                          isChecked={isChecked}
+                          onSelect={() => setSelectedTrack(f)}
+                          onToggleCheck={() => toggleSelectTrack(f.path)}
+                          onPlay={() => playFile(f)}
+                          onMenuClick={handleMenuClick}
+                          addToQueueNext={addToQueueNext}
+                          showToast={showToast}
+                        />
                       );
                     })}
                     {!currentFolders.length && !currentSongs.length && (
@@ -1014,8 +1448,8 @@ export default function Home() {
                               />
                             </th>
                             <th className="px-4 py-3 text-left">Title</th>
-                            <th className="px-4 py-3 text-center w-20">Type</th>
-                            <th className="px-4 py-3 text-right w-24">Size</th>
+                            <th className="px-4 py-3 text-center w-20 hidden sm:table-cell">Type</th>
+                            <th className="px-4 py-3 text-right w-24 hidden sm:table-cell">Size</th>
                             <th className="px-4 py-3 text-center w-28">Actions</th>
                           </tr>
                         </thead>
@@ -1034,10 +1468,10 @@ export default function Home() {
                                   <span>📂</span>
                                   <span className="truncate max-w-xs">{folderName}</span>
                                 </td>
-                                <td className="px-4 py-3 text-center">
+                                <td className="px-4 py-3 text-center hidden sm:table-cell">
                                   <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-900/20 text-emerald-400">FOLDER</span>
                                 </td>
-                                <td className="px-4 py-3 text-right text-gray-500">-</td>
+                                <td className="px-4 py-3 text-right text-gray-500 hidden sm:table-cell">-</td>
                                 <td className="px-4 py-3 text-center">
                                   <span className="text-gray-500 hover:text-emerald-400 font-medium">Open ➔</span>
                                 </td>
@@ -1047,33 +1481,25 @@ export default function Home() {
 
                           {/* Render Songs */}
                           {currentSongs.map((f, idx) => {
+                            const isSelected = selectedTrack?.path === f.path;
+                            const isPlayingFile = isPlaying && currentFile?.path === f.path;
                             const isChecked = selectedTracksList.includes(f.path);
+
                             return (
-                              <tr 
-                                key={f.path} 
-                                onClick={() => setSelectedTrack(f)} 
-                                className={`border-b border-gray-900/40 hover:bg-[#181b24]/50 cursor-pointer transition ${selectedTrack?.path === f.path ? 'bg-emerald-500/5' : ''}`}
-                              >
-                                <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
-                                  <input 
-                                    type="checkbox" 
-                                    checked={isChecked} 
-                                    onChange={() => toggleSelectTrack(f.path)} 
-                                    className="w-3.5 h-3.5 rounded bg-[#12131a] border-gray-800 accent-emerald-500 cursor-pointer focus:ring-0" 
-                                  />
-                                </td>
-                                <td className="px-4 py-3 font-semibold text-white truncate max-w-xs">{f.name.split('/').pop()}</td>
-                                <td className="px-4 py-3 text-center">
-                                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${f.type === 'video' ? 'bg-purple-900/30 text-purple-400' : 'bg-blue-900/30 text-blue-400'}`}>{f.type.toUpperCase()}</span>
-                                </td>
-                                <td className="px-4 py-3 text-right text-gray-400 font-mono">{fmtSize(f.size)}</td>
-                                <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
-                                  <div className="flex items-center justify-center gap-2">
-                                    <button onClick={() => playFile(f)} className="text-emerald-400 hover:text-emerald-300 font-semibold">▶ Play</button>
-                                    <button onClick={() => deleteFile(f.name)} className="text-rose-400 hover:text-rose-350 font-semibold">🗑 Del</button>
-                                  </div>
-                                </td>
-                              </tr>
+                              <ListSongRow
+                                key={f.path}
+                                f={f}
+                                isSelected={isSelected}
+                                isPlayingFile={isPlayingFile}
+                                isChecked={isChecked}
+                                onSelect={() => setSelectedTrack(f)}
+                                onToggleCheck={() => toggleSelectTrack(f.path)}
+                                onPlay={() => playFile(f)}
+                                onDelete={() => deleteFile(f.name)}
+                                onMenuClick={handleMenuClick}
+                                addToQueueNext={addToQueueNext}
+                                showToast={showToast}
+                              />
                             );
                           })}
                         </tbody>
@@ -1106,8 +1532,12 @@ export default function Home() {
                           <button onClick={e => { e.stopPropagation(); deletePlaylist(pl.id); }} className="text-rose-400 hover:text-rose-350 text-xs">Delete</button>
                         </div>
                         <div className="flex gap-2 mt-4" onClick={e => e.stopPropagation()}>
-                          <button onClick={() => playPlaylistRewrite(plItems)} className="text-[10px] py-1.5 bg-[#1b2f28] text-emerald-400 border border-emerald-950 hover:bg-emerald-900/20 rounded font-semibold flex-1 transition">▶ 재생 및 덮어쓰기</button>
-                          <button onClick={() => playPlaylistAppend(plItems)} className="text-[10px] py-1.5 bg-gray-800 text-gray-300 hover:bg-gray-700 rounded font-semibold flex-1 transition">➕ 대기열 추가</button>
+                          <button onClick={() => playPlaylistRewrite(plItems)} className="text-[10px] py-1.5 bg-[#1b2f28] text-emerald-400 border border-emerald-950 hover:bg-emerald-900/20 rounded font-semibold flex-1 transition flex items-center justify-center gap-1">
+                            <Icon name="play" size={12} className="fill-emerald-400/20" /> 재생 및 덮어쓰기
+                          </button>
+                          <button onClick={() => playPlaylistAppend(plItems)} className="text-[10px] py-1.5 bg-gray-800 text-gray-300 hover:bg-gray-700 rounded font-semibold flex-1 transition flex items-center justify-center gap-1">
+                            <Icon name="plus" size={12} /> 대기열 추가
+                          </button>
                         </div>
 
                         {isSelected && (
@@ -1116,10 +1546,14 @@ export default function Home() {
                               <h4 className="text-xs font-semibold text-gray-400 mb-2">Tracks ({plItems.length})</h4>
                               <div className="space-y-1.5 max-h-32 overflow-y-auto">
                                 {plItems.length ? plItems.map((item, idx) => (
-                                  <div key={`${item.path}-${idx}`} className="flex items-center justify-between p-2 bg-[#08090d]/60 rounded border border-gray-900/60">
-                                    <span className="text-xs truncate max-w-[120px] text-gray-300">{item.name}</span>
-                                    <button onClick={() => playFile(item)} className="text-emerald-400 text-xs font-bold">▶</button>
-                                  </div>
+                                  <PlaylistTrackItem
+                                    key={`${item.path}-${idx}`}
+                                    item={item}
+                                    onPlay={() => playFile(item)}
+                                    onMenuClick={handleMenuClick}
+                                    addToQueueNext={addToQueueNext}
+                                    showToast={showToast}
+                                  />
                                 )) : <p className="text-[10px] text-gray-500">플레이리스트가 비어 있습니다.</p>}
                               </div>
                             </div>
@@ -1184,7 +1618,7 @@ export default function Home() {
         </main>
 
         {/* PANEL 3: Right Track Inspector & Preview Panel */}
-        <aside className="w-80 bg-[#0f1118] border-l border-[#181b24] flex flex-col shrink-0 overflow-y-auto">
+        <aside className="hidden xl:flex w-80 bg-[#0f1118] border-l border-[#181b24] flex-col shrink-0 overflow-y-auto">
           {selectedTrack ? (
             <div className="p-6 space-y-6 flex-1 flex flex-col justify-between">
               
@@ -1249,10 +1683,10 @@ export default function Home() {
               <div className="space-y-3 pt-4 border-t border-gray-900">
                 <div className="flex gap-2">
                   <button onClick={() => playFile(selectedTrack)} className="flex-1 py-2 bg-[#12131a] hover:bg-[#181b24] text-white rounded-xl text-xs font-bold transition border border-gray-800 flex items-center justify-center gap-1.5">
-                    ▶ Play
+                    <Icon name="play" size={14} className="fill-white/10" /> Play
                   </button>
-                  <button onClick={() => deleteFile(selectedTrack.name)} className="px-3 py-2 bg-[#12131a] hover:bg-rose-950/20 hover:text-rose-400 border border-gray-800 text-gray-500 rounded-xl text-xs transition">
-                    🗑 Delete
+                  <button onClick={() => deleteFile(selectedTrack.name)} className="px-3 py-2 bg-[#12131a] hover:bg-rose-950/20 hover:text-rose-400 border border-gray-800 text-gray-500 rounded-xl text-xs transition flex items-center justify-center gap-1.5">
+                    <Icon name="trash" size={14} /> Delete
                   </button>
                 </div>
 
@@ -1297,7 +1731,7 @@ export default function Home() {
       {/* ─── Bottom Persistent Media Player Bar ─── */}
       {currentFile && (
         <>
-          <div className="h-20 bg-black/50 backdrop-blur-3xl border-t border-white/5 shadow-[0_-4px_30px_rgba(0,0,0,0.4)] flex items-center justify-between px-8 z-50 shrink-0 select-none relative">
+          <div className="hidden md:flex h-20 bg-black/50 backdrop-blur-3xl border-t border-white/5 shadow-[0_-4px_30px_rgba(0,0,0,0.4)] items-center justify-between px-8 z-50 shrink-0 select-none relative">
             {/* Subtle top glow line */}
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent"></div>
             {/* Left track details */}
@@ -1320,22 +1754,45 @@ export default function Home() {
               <div className="flex items-center gap-4">
                 <button
                   onClick={toggleShuffle}
-                  className={`text-xs transition ${isShuffle ? 'text-emerald-400' : 'text-gray-500 hover:text-gray-400'}`}
+                  className={`p-1.5 rounded-full transition-all ${isShuffle ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' : 'text-gray-500 hover:text-white'}`}
                   title="Shuffle"
                 >
-                  🔀
+                  <Icon name="shuffle" size={16} />
                 </button>
-                <button onClick={handlePrev} className="text-sm text-gray-400 hover:text-white transition">⏮</button>
-                <button onClick={togglePlay} className="w-8 h-8 bg-white text-gray-900 rounded-full flex items-center justify-center hover:scale-105 transition shadow">
-                  {isPlaying ? '⏸' : '▶'}
+                <button 
+                  onClick={handlePrev} 
+                  className="p-1.5 text-gray-400 hover:text-white active:scale-90 transition-transform"
+                  title="Previous Track"
+                >
+                  <Icon name="skip-back" size={18} />
                 </button>
-                <button onClick={() => handleNext(false)} className="text-sm text-gray-400 hover:text-white transition">⏭</button>
+                <button 
+                  onClick={togglePlay} 
+                  className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-black/60 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-[0.93] transition-all"
+                  title={isPlaying ? "Pause" : "Play"}
+                >
+                  <img 
+                    src={isPlaying ? "/images/premium_pause_icon.png" : "/images/premium_play_icon.png"} 
+                    alt={isPlaying ? "Pause" : "Play"} 
+                    className="w-full h-full object-cover scale-105"
+                  />
+                </button>
+                <button 
+                  onClick={() => handleNext(false)} 
+                  className="p-1.5 text-gray-400 hover:text-white active:scale-90 transition-transform"
+                  title="Next Track"
+                >
+                  <Icon name="skip-forward" size={18} />
+                </button>
                 <button
                   onClick={toggleRepeat}
-                  className={`text-xs transition ${repeatMode !== 'none' ? 'text-emerald-400' : 'text-gray-500 hover:text-gray-400'}`}
+                  className={`p-1.5 rounded-full relative transition-all ${repeatMode !== 'none' ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' : 'text-gray-500 hover:text-white'}`}
                   title={repeatMode === 'one' ? 'Repeat One' : repeatMode === 'all' ? 'Repeat All' : 'Repeat Off'}
                 >
-                  {repeatMode === 'one' ? '🔂' : '🔁'}
+                  <Icon name="repeat" size={16} />
+                  {repeatMode === 'one' && (
+                    <span className="absolute -top-1 -right-1 text-[7px] bg-emerald-500 text-black px-1 py-0.2 rounded-full font-black scale-90">1</span>
+                  )}
                 </button>
               </div>
 
@@ -1455,6 +1912,29 @@ export default function Home() {
         </div>
       )}
 
+      {/* ─── FLOATING CONTEXT MENU ─── */}
+      {contextMenu && (
+        <FloatingContextMenu
+          track={contextMenu.track}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          playlists={playlists}
+          onClose={() => setContextMenu(null)}
+          addToQueueNext={addToQueueNext}
+          showToast={showToast}
+          deleteFile={deleteFile}
+          onAddTrackToPlaylist={handleAddTrack}
+        />
+      )}
+
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<DashboardSkeleton />}>
+      <HomeContent />
+    </Suspense>
   );
 }

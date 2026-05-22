@@ -1,6 +1,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { MediaFile } from '../types';
+import { insertAfterCurrent } from '../lib/queueHelper';
 
 interface AudioContextType {
   currentFile: MediaFile | null;
@@ -32,6 +33,9 @@ interface AudioContextType {
   seekBy: (delta: number) => void;
   seekTo: (time: number) => void;
   getMediaEl: () => HTMLAudioElement | null;
+  addToQueueNext: (file: MediaFile) => void;
+  toast: { message: string; type: 'success' | 'error' | 'warning' } | null;
+  showToast: (message: string, type?: 'success' | 'error' | 'warning') => void;
 }
 
 const AudioContext = createContext<AudioContextType | null>(null);
@@ -61,6 +65,60 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const [queueIndex, setQueueIndex] = useState(0);
   const [repeatMode, setRepeatMode] = useState<'none' | 'all' | 'one'>('none');
   const [isShuffle, setIsShuffle] = useState(false);
+
+  // Toast state
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    setToast({ message, type });
+    toastTimeoutRef.current = setTimeout(() => {
+      setToast(null);
+      toastTimeoutRef.current = null;
+    }, 2500);
+  }, []);
+
+  const playFile = useCallback((file: MediaFile) => {
+    setCurrentFile(file);
+    setIsPlaying(true);
+    setCurrentTime(0);
+    setDuration(0);
+    setQueue(prev => prev.some(q => q.path === file.path) ? prev : [file, ...prev]);
+    setQueueIndex(0);
+
+    const audio = getAudio();
+    if (audio) {
+      if (audio.src && !audio.src.endsWith(file.path)) {
+        audio.src = file.path;
+      } else if (!audio.src) {
+        audio.src = file.path;
+      }
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+    }
+  }, []);
+
+  const addToQueueNext = useCallback((file: MediaFile) => {
+    const { queue } = stateRef.current;
+    if (!queue.length || !currentFile) {
+      playFile(file);
+      return;
+    }
+
+    setQueue(prev => {
+      const { newQueue, newQueueIndex } = insertAfterCurrent(prev, currentFile, stateRef.current.queueIndex, file);
+      
+      // Update queue index state safely
+      setTimeout(() => {
+        setQueueIndex(newQueueIndex);
+      }, 0);
+
+      return newQueue;
+    });
+  }, [currentFile, playFile]);
 
   // Use refs to avoid closure stale state in event listeners without re-binding
   const stateRef = useRef({ queue, queueIndex, repeatMode, isShuffle });
@@ -135,25 +193,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     if (audio) audio.volume = volume;
   }, [volume]);
 
-  const playFile = useCallback((file: MediaFile) => {
-    setCurrentFile(file);
-    setIsPlaying(true);
-    setCurrentTime(0);
-    setDuration(0);
-    setQueue(prev => prev.some(q => q.path === file.path) ? prev : [file, ...prev]);
-    setQueueIndex(0);
-
-    const audio = getAudio();
-    if (audio) {
-      if (audio.src && !audio.src.endsWith(file.path)) {
-        audio.src = file.path;
-      } else if (!audio.src) {
-        audio.src = file.path;
-      }
-      audio.currentTime = 0;
-      audio.play().catch(() => {});
-    }
-  }, []);
+  // playFile and addToQueueNext defined above
 
   const playPlaylistRewrite = useCallback((playlistTracks: MediaFile[]) => {
     if (!playlistTracks.length) return;
@@ -168,8 +208,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       const uniqueNew = playlistTracks.filter(newT => !prev.some(oldT => oldT.path === newT.path));
       return [...prev, ...uniqueNew];
     });
-    alert(`${playlistTracks.length}곡이 대기열에 추가되었습니다.`);
-  }, []);
+    showToast(`${playlistTracks.length}곡이 대기열에 추가되었습니다.`);
+  }, [showToast]);
 
   const handlePrev = useCallback(() => {
     const { queue, queueIndex, repeatMode, isShuffle } = stateRef.current;
@@ -286,7 +326,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       duration, setDuration, volume, setVolume, queue, setQueue, queueIndex, setQueueIndex,
       repeatMode, setRepeatMode, isShuffle, setIsShuffle,
       toggleShuffle, toggleRepeat, playFile, playPlaylistRewrite,
-      playPlaylistAppend, handlePrev, handleNext, togglePlay, seekBy, seekTo, getMediaEl: getAudio
+      playPlaylistAppend, handlePrev, handleNext, togglePlay, seekBy, seekTo, getMediaEl: getAudio,
+      addToQueueNext, toast, showToast
     }}>
       {children}
     </AudioContext.Provider>

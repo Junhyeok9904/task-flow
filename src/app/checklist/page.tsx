@@ -86,7 +86,7 @@ export default function ChecklistPage() {
       <div className="max-w-4xl mx-auto space-y-8 p-6 relative z-10 pt-16">
         
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-gray-900">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-gray-900">
           <div>
             <div className="flex items-center gap-3 mb-2">
               <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
@@ -100,14 +100,14 @@ export default function ChecklistPage() {
           </div>
           <Link 
             href="/progress" 
-            className="px-5 py-2.5 bg-gradient-to-r from-gray-800 to-gray-900 text-gray-300 border border-gray-700 rounded-xl hover:text-white font-bold text-xs transition duration-300 shadow-lg shrink-0"
+            className="px-5 py-2.5 w-full md:w-auto text-center bg-gradient-to-r from-gray-800 to-gray-900 text-gray-300 border border-gray-700 rounded-xl hover:text-white font-bold text-xs transition duration-300 shadow-lg shrink-0"
           >
             ← 메인 대시보드로 이동
           </Link>
         </div>
 
         {/* Progress Widget */}
-        <div className="bg-black/30 backdrop-blur-2xl border border-white/5 rounded-3xl p-6 shadow-2xl flex items-center gap-8">
+        <div className="bg-black/30 backdrop-blur-2xl border border-white/5 rounded-3xl p-6 shadow-2xl flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-6 sm:gap-8">
           {/* Circular Progress */}
           <div className="relative w-24 h-24 shrink-0 rounded-full flex items-center justify-center bg-[#181b24] shadow-[0_0_30px_rgba(16,185,129,0.2)]"
                style={{ background: `conic-gradient(#10b981 ${progress}%, #1f2937 ${progress}% 100%)` }}>
