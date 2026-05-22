@@ -152,6 +152,11 @@ export default function Home() {
   useEffect(() => {
     setMounted(true);
     setLoading(true);
+
+    // dev면 웹에 dev라고 페이지 타이틀에 뜨게 하는 기능
+    const isDev = process.env.NODE_ENV === 'development';
+    document.title = isDev ? '[DEV] Task-Flow' : 'Task-Flow';
+
     loadData().finally(() => {
       setLoading(false);
     });
