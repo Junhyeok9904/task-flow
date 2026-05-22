@@ -32,7 +32,7 @@ export function useUpload() {
 }
 
 const MAX_CONCURRENT = 3;
-const MAX_FILE_SIZE = 50 * 1024 * 1024;
+const WARNING_FILE_SIZE = 50 * 1024 * 1024; // 50MB (유저 경고)
 
 export function UploadProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<UploadTask[]>([]);
@@ -52,6 +52,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     if (!nextTask) return;
 
     activeCountRef.current += 1;
+    nextTask.status = 'UPLOADING'; // Mutate directly to prevent consecutive synchronous processQueue calls from picking it up
     updateTask(nextTask.id, { status: 'UPLOADING' });
 
     const xhr = new XMLHttpRequest();
@@ -112,31 +113,69 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const enqueueFiles = useCallback((files: File[]) => {
-    const newTasks: UploadTask[] = files.map(file => {
-      let status: UploadStatus = 'QUEUED';
-      let errorMessage = undefined;
+    const approvedFiles: File[] = [];
+    const rejectedTasks: UploadTask[] = [];
 
+    for (const file of files) {
       if (!file.type.startsWith('audio/') && !file.type.startsWith('video/')) {
-        status = 'ERROR';
-        errorMessage = 'Invalid file type. Must be audio or video.';
-      } else if (file.size > MAX_FILE_SIZE) {
-        status = 'ERROR';
-        errorMessage = `File exceeds max size of 50MB.`;
-      } else if (file.size === 0) {
-        status = 'ERROR';
-        errorMessage = 'File is empty.';
+        rejectedTasks.push({
+          id: crypto.randomUUID(),
+          file,
+          progress: 0,
+          loadedBytes: 0,
+          totalBytes: file.size,
+          status: 'ERROR',
+          errorMessage: 'Invalid file type. Must be audio or video.'
+        });
+        continue;
       }
 
-      return {
+      if (file.size === 0) {
+        rejectedTasks.push({
+          id: crypto.randomUUID(),
+          file,
+          progress: 0,
+          loadedBytes: 0,
+          totalBytes: file.size,
+          status: 'ERROR',
+          errorMessage: 'File is empty.'
+        });
+        continue;
+      }
+
+      if (file.size > WARNING_FILE_SIZE) {
+        const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+        const confirmUpload = window.confirm(
+          `⚠️ 대용량 파일 경고\n\n'${file.name}' 파일의 크기는 ${sizeMB}MB로 50MB를 초과합니다.\n계속 업로드하시겠습니까?`
+        );
+        if (!confirmUpload) {
+          rejectedTasks.push({
+            id: crypto.randomUUID(),
+            file,
+            progress: 0,
+            loadedBytes: 0,
+            totalBytes: file.size,
+            status: 'CANCELED',
+            errorMessage: 'User declined large file upload.'
+          });
+          continue;
+        }
+      }
+
+      approvedFiles.push(file);
+    }
+
+    const newTasks: UploadTask[] = [
+      ...rejectedTasks,
+      ...approvedFiles.map(file => ({
         id: crypto.randomUUID(),
         file,
         progress: 0,
         loadedBytes: 0,
         totalBytes: file.size,
-        status,
-        errorMessage
-      };
-    });
+        status: 'QUEUED' as UploadStatus,
+      }))
+    ];
 
     setTasks(prev => [...prev, ...newTasks]);
     

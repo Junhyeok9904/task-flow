@@ -30,9 +30,21 @@ export async function POST(request: Request) {
       return new Promise((resolve) => {
         // Spawn cloudflared from the locally installed npm package
         // Note: cloudflared outputs all its logs to stderr, not stdout.
-        tunnelProcess = spawn('npx', ['cloudflared', 'tunnel', '--url', `http://localhost:${port}`]);
+        // shell: true is required on Windows to resolve npx batch script (.cmd)
+        const cmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+        tunnelProcess = spawn(cmd, ['cloudflared', 'tunnel', '--url', `http://localhost:${port}`], {
+          shell: true
+        });
 
         let foundUrl = false;
+
+        tunnelProcess.on('error', (err) => {
+          console.error('[Tunnel] Spawn error:', err);
+          if (!foundUrl) {
+            foundUrl = true;
+            resolve(NextResponse.json({ error: `Failed to spawn tunnel process: ${err.message}` }, { status: 500 }));
+          }
+        });
 
         tunnelProcess.stderr?.on('data', (data) => {
           const output = data.toString();

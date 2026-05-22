@@ -49,8 +49,7 @@ export interface UploadResult {
   metadata: MediaMetadata;
 }
 
-// ─── File Size Limit ─────────────────────────────────────────────
-const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200MB
+
 
 // ─── MIME Type Validation ────────────────────────────────────────
 const ALLOWED_AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac', '.wma']);
@@ -85,9 +84,7 @@ export async function saveFileStream(file: File, filename: string): Promise<Stor
   if (!isAllowedExtension(filename)) {
     throw new Error(`허용되지 않는 파일 확장자입니다: ${path.extname(filename)}`);
   }
-  if (file.size > MAX_FILE_SIZE) {
-    throw new Error(`파일 크기가 제한(${MAX_FILE_SIZE / 1024 / 1024}MB)을 초과합니다.`);
-  }
+
 
   const targetPath = path.join(MEDIA_DIR, filename);
   const writeStream = fs.createWriteStream(targetPath);

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getMediaFilesAsync, addMediaFileAsync } from '../../../../lib/store';
+import { getMediaFilesAsync, upsertMediaFileAsync } from '../../../../lib/store';
 import { scanMediaDirectory, extractMetadata, getMediaType } from '../../../../lib/storage';
 
 export const dynamic = 'force-dynamic';
@@ -64,7 +64,7 @@ export async function POST() {
         coverArt,
       };
 
-      await addMediaFileAsync(newMedia);
+      await upsertMediaFileAsync(newMedia);
       results.push(newMedia);
     }
 

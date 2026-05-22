@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getMediaFilesAsync, addMediaFileAsync, saveMediaFilesAsync } from '../../../lib/store';
+import { getMediaFilesAsync, addMediaFileAsync, saveMediaFilesAsync, upsertMediaFileAsync } from '../../../lib/store';
 import {
   saveFileStream,
   extractMetadata,
@@ -40,13 +40,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const MAX_SIZE = 200 * 1024 * 1024; // 200MB
-    if (file.size > MAX_SIZE) {
-      return NextResponse.json(
-        { error: `File size exceeds ${MAX_SIZE / 1024 / 1024}MB limit.` },
-        { status: 413 }
-      );
-    }
+
 
     // ─── Stream-Based File Save ────────────────────────────────
     // 기존: Buffer.from(await file.arrayBuffer()) → 전체 메모리 적재
@@ -79,14 +73,7 @@ export async function POST(request: Request) {
     };
 
     // ─── Store Update (비동기 + write-lock) ────────────────────
-    const allMedia = await getMediaFilesAsync();
-    const existingIndex = allMedia.findIndex(m => m.name === filename);
-    if (existingIndex >= 0) {
-      allMedia[existingIndex] = { ...allMedia[existingIndex], ...newMedia };
-      await saveMediaFilesAsync(allMedia);
-    } else {
-      await addMediaFileAsync(newMedia);
-    }
+    await upsertMediaFileAsync(newMedia);
 
     return NextResponse.json({ success: true, files: [newMedia] });
   } catch (e: any) {
@@ -132,30 +119,58 @@ export async function GET() {
  */
 export async function DELETE(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const filename = searchParams.get('filename');
-    if (!filename) {
-      return NextResponse.json({ error: 'No filename provided' }, { status: 400 });
+    let filenames: string[] = [];
+
+    // 1. Try reading from JSON body
+    try {
+      const clonedRequest = request.clone();
+      const body = await clonedRequest.json();
+      if (body && Array.isArray(body.filenames)) {
+        filenames = body.filenames;
+      }
+    } catch {
+      // Body not readable or not JSON, ignore
     }
 
-    // media.json에서 해당 항목 찾기
+    // 2. Try reading from query parameters if body is empty
+    if (filenames.length === 0) {
+      const { searchParams } = new URL(request.url);
+      const filenameParam = searchParams.get('filename');
+      const filenamesParam = searchParams.get('filenames');
+      
+      if (filenamesParam) {
+        filenames = filenamesParam.split(',').map(s => s.trim()).filter(Boolean);
+      } else if (filenameParam) {
+        filenames = [filenameParam];
+      }
+    }
+
+    if (filenames.length === 0) {
+      return NextResponse.json({ error: 'No filenames provided' }, { status: 400 });
+    }
+
+    // media.json에서 해당 항목들 찾아서 삭제
     const allMedia = await getMediaFilesAsync();
-    const mediaItem = allMedia.find(m => m.name === filename);
-    const mediaId = mediaItem?.id;
+    let deletedCount = 0;
 
-    // 파일 삭제 (커버아트 포함)
-    const deleted = await deleteMediaFile(filename, mediaId);
-    if (!deleted) {
-      return NextResponse.json({ error: 'File not found' }, { status: 404 });
+    for (const filename of filenames) {
+      const mediaItem = allMedia.find(m => m.name === filename);
+      const mediaId = mediaItem?.id;
+      const deleted = await deleteMediaFile(filename, mediaId);
+      if (deleted) {
+        deletedCount++;
+      }
     }
 
-    // media.json에서 항목 제거
-    if (mediaItem) {
-      const updatedMedia = allMedia.filter(m => m.name !== filename);
-      await saveMediaFilesAsync(updatedMedia);
-    }
+    // media.json에서 제거
+    const updatedMedia = allMedia.filter(m => !filenames.includes(m.name));
+    await saveMediaFilesAsync(updatedMedia);
 
-    return NextResponse.json({ success: true, message: 'File deleted successfully' });
+    return NextResponse.json({ 
+      success: true, 
+      message: `${deletedCount} files deleted successfully`,
+      deletedCount 
+    });
   } catch (e: any) {
     console.error('Delete error:', e);
     return NextResponse.json(

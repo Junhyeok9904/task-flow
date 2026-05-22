@@ -47,7 +47,7 @@ function getGradientFromTitle(title: string) {
 }
 
 export default function Home() {
-  const { enqueueFiles } = useUpload();
+  const { enqueueFiles, tasks } = useUpload();
   const [mounted, setMounted] = useState(false);
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
@@ -186,6 +186,16 @@ export default function Home() {
     }
   }, [mediaFiles]);
 
+  // 파일 업로드 성공 시 라이브러리 목록 자동 갱신
+  const prevSuccessCount = useRef(0);
+  const successCount = tasks.filter(t => t.status === 'SUCCESS').length;
+  useEffect(() => {
+    if (successCount > prevSuccessCount.current) {
+      loadData();
+    }
+    prevSuccessCount.current = successCount;
+  }, [successCount]);
+
   const deleteFile = async (filename: string) => {
     if (!confirm(`Are you sure you want to delete ${filename}?`)) return;
     try {
@@ -206,6 +216,48 @@ export default function Home() {
         alert('Failed to delete file');
       }
     } catch (e) { console.error(e); }
+  };
+
+  const deleteSelectedTracks = async () => {
+    if (!selectedTracksList.length) return;
+    
+    const filenamesToDelete = selectedTracksList
+      .map(path => mediaFiles.find(m => m.path === path)?.name)
+      .filter(Boolean) as string[];
+
+    if (filenamesToDelete.length === 0) return;
+
+    if (!confirm(`Are you sure you want to delete ${filenamesToDelete.length} selected files?`)) return;
+
+    try {
+      const res = await fetch('/api/media', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ filenames: filenamesToDelete })
+      });
+
+      if (res.ok) {
+        if (currentFile && filenamesToDelete.includes(currentFile.name)) {
+          const el = getMediaEl();
+          if (el) el.pause();
+          setCurrentFile(null);
+          setIsPlaying(false);
+        }
+        if (selectedTrack && filenamesToDelete.includes(selectedTrack.name)) {
+          setSelectedTrack(null);
+        }
+        setQueue(prev => prev.filter(q => !filenamesToDelete.includes(q.name)));
+        setSelectedTracksList([]);
+        await loadData();
+        alert('Selected files deleted successfully');
+      } else {
+        alert('Failed to delete selected files');
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
 
@@ -334,6 +386,7 @@ export default function Home() {
 
   const onDrop = async (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setDragOver(false);
     await handleUpload(e.dataTransfer.files);
   };
@@ -527,8 +580,8 @@ export default function Home() {
           </nav>
 
           {/* Cloudflare Tunnel Widget */}
-          <div className="p-4 border-t border-white/5 bg-black/20">
-            <div className="flex items-center justify-between text-[10px] text-gray-500 uppercase font-semibold mb-2">
+          <div className="p-4 border-t border-white/5 bg-black/20 space-y-2.5">
+            <div className="flex items-center justify-between text-[10px] text-gray-500 uppercase font-semibold">
               <span>Public Access</span>
               {isTunneling ? (
                 <span className="text-emerald-400 text-xs animate-pulse">☁️ Connected</span>
@@ -550,9 +603,20 @@ export default function Home() {
             </button>
             
             {isTunneling && tunnelUrl && (
-              <div className="mt-2 text-center relative group cursor-pointer" onClick={() => { navigator.clipboard.writeText(tunnelUrl); alert('URL copied!'); }}>
-                <span className="text-[9px] text-emerald-400/80 font-mono break-all line-clamp-1 group-hover:text-emerald-400 transition">{tunnelUrl}</span>
-                <div className="text-[8px] text-gray-500 mt-0.5">Click to copy URL</div>
+              <div className="space-y-2 pt-1.5 border-t border-white/5">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(tunnelUrl);
+                    alert('Public URL copied to clipboard!');
+                  }}
+                  className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 text-black rounded-lg text-xs font-bold transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-1.5 active:scale-95"
+                >
+                  <span>📋</span> Copy Public URL
+                </button>
+                <div className="p-2.5 bg-[#12131a] border border-gray-800 rounded-lg text-center selection:bg-emerald-500/30">
+                  <div className="text-[8px] text-gray-500 uppercase font-bold tracking-wider mb-1">Current Public Address</div>
+                  <span className="text-[10px] text-emerald-400 font-mono break-all select-all block leading-relaxed">{tunnelUrl}</span>
+                </div>
               </div>
             )}
           </div>
@@ -644,7 +708,25 @@ export default function Home() {
 
           {/* Browser grid header labels */}
           <div className="px-6 pt-5 pb-2.5 flex items-center justify-between shrink-0">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Active searched & uploaded music files</h2>
+            {selectedTracksList.length > 0 ? (
+              <div className="flex items-center gap-3 bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 rounded-xl animate-pulse">
+                <span className="text-[10px] text-rose-400 font-bold font-mono">{selectedTracksList.length} Selected</span>
+                <button
+                  onClick={deleteSelectedTracks}
+                  className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[10px] font-bold transition-all active:scale-95"
+                >
+                  🗑 선택 삭제 (Delete Selected)
+                </button>
+                <button
+                  onClick={() => setSelectedTracksList([])}
+                  className="text-gray-400 hover:text-white text-[10px] font-semibold"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Active searched & uploaded music files</h2>
+            )}
             <div className="flex items-center gap-3 text-[10px] text-gray-500">
               <span>{sortedSongs.length} tracks found</span>
               
@@ -772,7 +854,20 @@ export default function Home() {
                       <table className="w-full text-xs">
                         <thead className="bg-[#0f1118]/80 text-gray-500 border-b border-gray-900">
                           <tr>
-                            <th className="px-4 py-3 text-center w-10">#</th>
+                            <th className="px-4 py-3 text-center w-10">
+                              <input 
+                                type="checkbox"
+                                checked={sortedSongs.length > 0 && sortedSongs.every(s => selectedTracksList.includes(s.path))}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedTracksList(sortedSongs.map(s => s.path));
+                                  } else {
+                                    setSelectedTracksList([]);
+                                  }
+                                }}
+                                className="w-3.5 h-3.5 rounded bg-[#12131a] border-gray-800 accent-emerald-500 cursor-pointer focus:ring-0"
+                              />
+                            </th>
                             <th className="px-4 py-3 text-left">Title</th>
                             <th className="px-4 py-3 text-center w-20">Type</th>
                             <th className="px-4 py-3 text-right w-24">Size</th>
@@ -780,14 +875,23 @@ export default function Home() {
                           </tr>
                         </thead>
                         <tbody>
-                          {sortedSongs.map((f, idx) => (
-                            <tr 
-                              key={f.path} 
-                              onClick={() => setSelectedTrack(f)} 
-                              className={`border-b border-gray-900/40 hover:bg-[#181b24]/50 cursor-pointer transition ${selectedTrack?.path === f.path ? 'bg-emerald-500/5' : ''}`}
-                            >
-                              <td className="px-4 py-3 text-center text-gray-600 font-mono">{idx + 1}</td>
-                              <td className="px-4 py-3 font-semibold text-white truncate max-w-xs">{f.name}</td>
+                          {sortedSongs.map((f, idx) => {
+                            const isChecked = selectedTracksList.includes(f.path);
+                            return (
+                              <tr 
+                                key={f.path} 
+                                onClick={() => setSelectedTrack(f)} 
+                                className={`border-b border-gray-900/40 hover:bg-[#181b24]/50 cursor-pointer transition ${selectedTrack?.path === f.path ? 'bg-emerald-500/5' : ''}`}
+                              >
+                                <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
+                                  <input 
+                                    type="checkbox" 
+                                    checked={isChecked} 
+                                    onChange={() => toggleSelectTrack(f.path)} 
+                                    className="w-3.5 h-3.5 rounded bg-[#12131a] border-gray-800 accent-emerald-500 cursor-pointer focus:ring-0" 
+                                  />
+                                </td>
+                                <td className="px-4 py-3 font-semibold text-white truncate max-w-xs">{f.name}</td>
                               <td className="px-4 py-3 text-center">
                                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${f.type === 'video' ? 'bg-purple-900/30 text-purple-400' : 'bg-blue-900/30 text-blue-400'}`}>{f.type.toUpperCase()}</span>
                               </td>
@@ -798,8 +902,9 @@ export default function Home() {
                                   <button onClick={() => deleteFile(f.name)} className="text-rose-400 hover:text-rose-350 font-semibold">🗑 Del</button>
                                 </div>
                               </td>
-                            </tr>
-                          ))}
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

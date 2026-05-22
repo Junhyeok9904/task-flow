@@ -202,6 +202,20 @@ export function addMediaFileAsync(file: MediaFile): Promise<void> {
   });
 }
 
+// 비동기 + write-lock 버전 (존재 시 업데이트, 없을 시 추가)
+export function upsertMediaFileAsync(file: MediaFile): Promise<void> {
+  return withMediaLock(async () => {
+    const files = await getMediaFilesAsync();
+    const existingIndex = files.findIndex(m => m.name === file.name);
+    if (existingIndex >= 0) {
+      files[existingIndex] = { ...files[existingIndex], ...file };
+    } else {
+      files.push(file);
+    }
+    await fsp.writeFile(MEDIA_FILE, JSON.stringify(files, null, 2));
+  });
+}
+
 export function saveMediaFiles(files: MediaFile[]): void {
   writeJSON(MEDIA_FILE, files);
 }
