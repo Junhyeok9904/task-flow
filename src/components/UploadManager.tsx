@@ -1,7 +1,7 @@
 'use client';
 import React, { createContext, useContext, useState, useRef, ReactNode, useCallback } from 'react';
 
-export type UploadStatus = 'VALIDATING' | 'QUEUED' | 'UPLOADING' | 'SUCCESS' | 'ERROR' | 'CANCELED';
+export type UploadStatus = 'VALIDATING' | 'QUEUED' | 'UPLOADING' | 'SUCCESS' | 'ERROR' | 'CANCELED' | 'PENDING_CONFIRMATION';
 
 export interface UploadTask {
   id: string;
@@ -22,6 +22,7 @@ interface UploadContextType {
   cancelTask: (id: string) => void;
   dismissTask: (id: string) => void;
   dismissAllTerminal: () => void;
+  confirmLargeUpload: (id: string) => void;
 }
 
 const UploadContext = createContext<UploadContextType | null>(null);
@@ -150,23 +151,16 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       }
 
       if (file.size > WARNING_FILE_SIZE) {
-        const sizeMB = (file.size / 1024 / 1024).toFixed(1);
-        const confirmUpload = window.confirm(
-          `⚠️ 대용량 파일 경고\n\n'${file.name}' 파일의 크기는 ${sizeMB}MB로 50MB를 초과합니다.\n계속 업로드하시겠습니까?`
-        );
-        if (!confirmUpload) {
-          rejectedTasks.push({
-            id: crypto.randomUUID(),
-            file,
-            progress: 0,
-            loadedBytes: 0,
-            totalBytes: file.size,
-            status: 'CANCELED',
-            errorMessage: 'User declined large file upload.',
-            folder,
-          });
-          continue;
-        }
+        rejectedTasks.push({
+          id: crypto.randomUUID(),
+          file,
+          progress: 0,
+          loadedBytes: 0,
+          totalBytes: file.size,
+          status: 'PENDING_CONFIRMATION',
+          folder,
+        });
+        continue;
       }
 
       approvedFiles.push(file);
@@ -188,6 +182,11 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     setTasks(prev => [...prev, ...newTasks]);
     
     // Let state settle, then process
+    setTimeout(processQueue, 0);
+  }, [processQueue]);
+
+  const confirmLargeUpload = useCallback((id: string) => {
+    updateTask(id, { status: 'QUEUED' });
     setTimeout(processQueue, 0);
   }, [processQueue]);
 
@@ -218,10 +217,10 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   const activeTasks = tasks.filter(t => t.status === 'QUEUED' || t.status === 'UPLOADING').length;
   
   const overallProgress = tasks.length === 0 ? 0 :
-    tasks.reduce((acc, t) => acc + (t.status === 'SUCCESS' ? 100 : (t.status === 'ERROR' || t.status === 'CANCELED' ? 0 : t.progress)), 0) / tasks.length;
+    tasks.reduce((acc, t) => acc + (t.status === 'SUCCESS' ? 100 : (t.status === 'ERROR' || t.status === 'CANCELED' || t.status === 'PENDING_CONFIRMATION' ? 0 : t.progress)), 0) / tasks.length;
 
   return (
-    <UploadContext.Provider value={{ tasks, enqueueFiles, retryTask, cancelTask, dismissTask, dismissAllTerminal }}>
+    <UploadContext.Provider value={{ tasks, enqueueFiles, retryTask, cancelTask, dismissTask, dismissAllTerminal, confirmLargeUpload }}>
       {children}
       {isVisible && (
         <div className="fixed bottom-6 right-6 w-[400px] bg-[#0b0c10]/90 backdrop-blur-xl border border-gray-800 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] z-[100] flex flex-col overflow-hidden text-gray-200">
@@ -240,7 +239,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
 
           <div className="max-h-80 overflow-y-auto p-3 space-y-2 custom-scrollbar">
             {tasks.map(t => (
-              <div key={t.id} className="p-3 bg-[#13161f] border border-gray-800/80 rounded-xl relative overflow-hidden group shadow-sm">
+              <div key={t.id} className={`p-3 bg-[#13161f] border rounded-xl relative overflow-hidden group shadow-sm transition ${t.status === 'PENDING_CONFIRMATION' ? 'border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.05)]' : 'border-gray-800/80'}`}>
                 <div className="absolute top-0 left-0 h-full bg-emerald-500/5 transition-all duration-300" style={{ width: `${t.progress}%` }}></div>
                 <div className="relative z-10 flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
@@ -251,12 +250,33 @@ export function UploadProvider({ children }: { children: ReactNode }) {
                       {t.status === 'CANCELED' && <span className="text-gray-500">🚫 CANCELED</span>}
                       {t.status === 'QUEUED' && <span className="text-blue-400 animate-pulse">QUEUED</span>}
                       {t.status === 'UPLOADING' && <span className="text-emerald-400">{t.progress}%</span>}
+                      {t.status === 'PENDING_CONFIRMATION' && <span className="text-amber-400">⚠️ CONFIRM</span>}
                     </span>
                   </div>
                   
                   {t.status === 'ERROR' && (
                     <div className="text-[10px] text-rose-400/90 font-medium bg-rose-500/10 p-1.5 rounded mt-1">
                       {t.errorMessage}
+                    </div>
+                  )}
+
+                  {t.status === 'PENDING_CONFIRMATION' && (
+                    <div className="text-[10px] text-amber-400 font-medium bg-amber-500/10 p-2 rounded mt-1 border border-amber-500/20 flex flex-col gap-2">
+                      <span>⚠️ 이 파일은 50MB를 초과하는 대용량 파일입니다. 계속 업로드하시겠습니까?</span>
+                      <div className="flex justify-end gap-2">
+                        <button 
+                          onClick={() => confirmLargeUpload(t.id)} 
+                          className="px-2 py-0.5 rounded bg-emerald-500 text-black hover:bg-emerald-400 font-bold transition text-[9px]"
+                        >
+                          승인 (Upload)
+                        </button>
+                        <button 
+                          onClick={() => cancelTask(t.id)} 
+                          className="px-2 py-0.5 rounded bg-gray-800 text-gray-400 hover:text-white font-semibold transition text-[9px]"
+                        >
+                          취소
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -271,7 +291,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
                       {(t.status === 'UPLOADING' || t.status === 'QUEUED') && (
                         <button onClick={() => cancelTask(t.id)} className="text-[10px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-2.5 py-1 rounded transition font-bold">CANCEL</button>
                       )}
-                      {(t.status === 'SUCCESS' || t.status === 'ERROR' || t.status === 'CANCELED') && (
+                      {(t.status === 'SUCCESS' || t.status === 'ERROR' || t.status === 'CANCELED' || t.status === 'PENDING_CONFIRMATION') && (
                         <button onClick={() => dismissTask(t.id)} className="text-[10px] text-gray-500 hover:text-white px-1">✕</button>
                       )}
                     </div>
