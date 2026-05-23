@@ -194,7 +194,7 @@ set "TUNNEL_URL="
 set "wait_count=0"
 
 :WAIT_TUNNEL_LOOP
-for /f "tokens=*" %%u in ('powershell -Command "docker logs cloudflared 2>&1 | Select-String -Pattern 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' | ForEach-Object { $_.Matches.Value } | Select-Object -First 1"') do set TUNNEL_URL=%%u
+for /f "tokens=*" %%u in ('powershell -Command "docker logs cloudflared 2>&1 | Select-String -Pattern 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' | Select-Object -ExpandProperty Matches | Select-Object -ExpandProperty Value | Select-Object -First 1"') do set TUNNEL_URL=%%u
 
 if not "%TUNNEL_URL%"=="" goto DOCKER_TUNNEL_FOUND
 set /a wait_count+=1
