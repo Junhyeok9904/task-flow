@@ -331,21 +331,34 @@ export default function ProgressPage() {
                         </p>
                       )}
                       
-                      {/* Kanban Actions */}
-                      <div className="flex gap-1 mt-3 pl-6 flex-wrap pointer-events-auto">
+                      {/* Kanban Actions - Semi-translucent Capsules */}
+                      <div className="flex items-center gap-1.5 mt-3 pl-6 flex-wrap pointer-events-auto">
+                        <span className="text-[7px] text-gray-600 font-bold uppercase tracking-wider">이동:</span>
                         {status !== 'pending' && (
-                          <button onPointerDown={e => e.stopPropagation()} onClick={() => updateTask(task.id, { status: 'pending' })} className="text-[8px] font-bold px-2 py-1 bg-gray-900 border border-gray-850 hover:bg-[#1b2520] hover:text-amber-400 text-gray-400 rounded-md transition uppercase">
-                            ← 대기
+                          <button 
+                            onPointerDown={e => e.stopPropagation()} 
+                            onClick={() => updateTask(task.id, { status: 'pending' })} 
+                            className="text-[8px] font-bold px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500 hover:text-black text-amber-400 rounded-full transition-all duration-200 active:scale-95"
+                          >
+                            대기
                           </button>
                         )}
                         {status !== 'in_progress' && (
-                          <button onPointerDown={e => e.stopPropagation()} onClick={() => updateTask(task.id, { status: 'in_progress' })} className="text-[8px] font-bold px-2 py-1 bg-gray-900 border border-gray-850 hover:bg-[#1b2520] hover:text-blue-400 text-gray-400 rounded-md transition uppercase">
-                            → 진행
+                          <button 
+                            onPointerDown={e => e.stopPropagation()} 
+                            onClick={() => updateTask(task.id, { status: 'in_progress' })} 
+                            className="text-[8px] font-bold px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500 hover:text-white text-blue-400 rounded-full transition-all duration-200 active:scale-95"
+                          >
+                            진행
                           </button>
                         )}
                         {status !== 'completed' && (
-                          <button onPointerDown={e => e.stopPropagation()} onClick={() => updateTask(task.id, { checked: true, status: 'completed' })} className="text-[8px] font-bold px-2 py-1 bg-gray-900 border border-gray-850 hover:bg-[#1b2520] hover:text-emerald-400 text-gray-400 rounded-md transition uppercase">
-                            ✓ 완료
+                          <button 
+                            onPointerDown={e => e.stopPropagation()} 
+                            onClick={() => updateTask(task.id, { checked: true, status: 'completed' })} 
+                            className="text-[8px] font-bold px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500 hover:text-black text-emerald-400 rounded-full transition-all duration-200 active:scale-95"
+                          >
+                            완료
                           </button>
                         )}
                       </div>
@@ -361,11 +374,11 @@ export default function ProgressPage() {
               const placeholderCard = (
                 <div 
                   key="drag-placeholder"
-                  className={`p-5 rounded-2xl border-2 border-dashed h-[110px] flex items-center justify-center text-xs font-bold transition-all duration-200 bg-white/5 animate-pulse
-                    ${status === 'completed' ? 'border-emerald-500/40 text-emerald-400/50' : status === 'in_progress' ? 'border-blue-500/40 text-blue-400/50' : 'border-purple-500/40 text-purple-400/50'}
+                  className={`p-4 rounded-xl border-2 border-dashed h-[80px] flex items-center justify-center text-[10px] font-bold uppercase tracking-wider transition-all duration-200 bg-white/5 animate-pulse
+                    ${status === 'completed' ? 'border-emerald-500/50 text-emerald-400/60 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : status === 'in_progress' ? 'border-blue-500/50 text-blue-400/60 shadow-[0_0_15px_rgba(59,130,246,0.1)]' : 'border-amber-500/50 text-amber-400/60 shadow-[0_0_15px_rgba(245,158,11,0.1)]'}
                   `}
                 >
-                  이곳에 드롭
+                  이곳에 드롭 (Drop Here)
                 </div>
               );
               const insertIdx = Math.min(Math.max(0, dragState.targetIndex), cardElements.length);
@@ -380,7 +393,7 @@ export default function ProgressPage() {
                 data-status={status}
                 className={`column-container bg-[#13161f]/60 backdrop-blur-md border rounded-2xl overflow-hidden shadow-xl flex flex-col h-[65vh] transition-all duration-300 ${
                   isHovered 
-                    ? 'border-purple-500/60 shadow-[0_0_20px_rgba(168,85,247,0.2)] bg-black/60 scale-[1.01]' 
+                    ? 'border-purple-500/80 shadow-[0_0_25px_rgba(168,85,247,0.25)] bg-[#171a26]/90 scale-[1.02]' 
                     : 'border-gray-900 hover:border-gray-800'
                 }`}
               >
@@ -446,12 +459,10 @@ export default function ProgressPage() {
             height: ghost.height,
             pointerEvents: 'none',
             zIndex: 9999,
-            transform: 'rotate(2.5deg) scale(1.03)',
-            transition: 'transform 0.05s ease-out',
+            transform: 'rotate(3deg) scale(1.05)',
+            transition: 'transform 0.1s cubic-bezier(0.16, 1, 0.3, 1)',
           }}
-          className={`p-4 bg-white/10 backdrop-blur-2xl rounded-xl border shadow-[0_20px_50px_rgba(168,85,247,0.3)] text-[#cfd3db] select-none
-            ${borderBgMap[ghost.status]}
-          `}
+          className={`p-4 bg-[#1e2230]/40 backdrop-blur-xl rounded-xl border border-purple-500/40 shadow-[0_15px_35px_rgba(168,85,247,0.35),0_0_20px_rgba(168,85,247,0.2)] text-[#cfd3db] select-none ${borderBgMap[ghost.status]}`}
         >
           <div className="flex items-start justify-between gap-2.5">
             <h4 className="flex-1 text-sm font-bold text-white leading-snug">
@@ -459,7 +470,7 @@ export default function ProgressPage() {
             </h4>
           </div>
           {ghost.description && (
-            <p className="w-full text-[11px] text-gray-400 line-clamp-3 mt-2 pl-6 leading-relaxed">
+            <p className="w-full text-[10px] text-gray-400 line-clamp-2 mt-2 pl-6 leading-relaxed">
               {ghost.description}
             </p>
           )}

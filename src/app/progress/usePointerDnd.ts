@@ -223,6 +223,7 @@ export function usePointerDnd(
           isDragging: true,
         });
         document.body.classList.add('is-dragging');
+        document.body.style.overflow = 'hidden';
       }
       return;
     }
@@ -257,6 +258,7 @@ export function usePointerDnd(
     const session = sessionRef.current;
 
     document.body.classList.remove('is-dragging');
+    document.body.style.overflow = '';
 
     if (!session) return;
     sessionRef.current = null;
@@ -271,6 +273,7 @@ export function usePointerDnd(
         targetIndex: 0,
         isDragging: false,
       });
+      document.body.style.overflow = '';
       return;
     }
 
@@ -402,11 +405,20 @@ export function usePointerDnd(
 
   // Clean animation loops on unmount to prevent leaks
   useEffect(() => {
+    const preventDefaultTouch = (e: TouchEvent) => {
+      if (stateRef.current.isDragging) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('touchmove', preventDefaultTouch, { passive: false });
+
     return () => {
       stopAutoScroll();
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
       window.removeEventListener('pointercancel', handlePointerUp);
+      window.removeEventListener('touchmove', preventDefaultTouch);
+      document.body.style.overflow = '';
     };
   }, [handlePointerMove, handlePointerUp]);
 
