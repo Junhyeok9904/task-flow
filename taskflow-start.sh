@@ -54,14 +54,98 @@ if [ "$mode" == "1" ]; then
     API_URL="http://localhost:$prod_port/api/tunnel"
     START_RESP=$(curl -s -X POST "$API_URL" -H "Content-Type: application/json" -d '{"action":"start"}' 2>/dev/null)
     
+    export START_RESP_ENV="$START_RESP"
+    TUNNEL_URL=$(node -e "try { console.log(JSON.parse(process.env.START_RESP_ENV).url || ''); } catch(e) { console.log(''); }")
+    TUNNEL_STATUS=$(node -e "try { console.log(JSON.parse(process.env.START_RESP_ENV).status || ''); } catch(e) { console.log(''); }")
+    TUNNEL_ERR=$(node -e "try { console.log(JSON.parse(process.env.START_RESP_ENV).error || ''); } catch(e) { console.log(''); }")
+
     echo ""
     echo "==========================================="
     echo "   Task-Flow Production URL and Tunnel Info"
     echo "==========================================="
-    echo "$START_RESP"
+    if [ ! -z "$TUNNEL_URL" ]; then
+        echo "  🟢 Status: $TUNNEL_STATUS"
+        echo "  🔗 Public URL: $TUNNEL_URL"
+        echo "  🏠 Local URL:  http://localhost:$prod_port"
+    else
+        echo "  ❌ Status: Error"
+        if [ ! -z "$TUNNEL_ERR" ]; then
+            echo "  ❌ Error Details: $TUNNEL_ERR"
+        else
+            echo "  ❌ Could not start or parse tunnel info."
+        fi
+    fi
     echo "==========================================="
     echo ""
-    
+
+    if [ ! -z "$TUNNEL_URL" ]; then
+        echo "Select tunnel URL sharing option:"
+        echo "1) Open URL in Brave Browser (PC) to use Brave Sync/Send-to-device"
+        echo "2) Open QR Code image in Browser (Scan with Mobile Camera)"
+        echo "3) Send directly to connected Android Mobile (via ADB)"
+        echo "4) Skip sharing [Default: 4]"
+        read -p "Enter choice (1-4): " share_choice
+        
+        case "$share_choice" in
+            1)
+                # Open in Brave
+                if [ "$(uname)" == "Darwin" ]; then
+                    if [ -d "/Applications/Brave Browser.app" ]; then
+                        echo "🚀 Opening Brave Browser..."
+                        open -a "Brave Browser" "$TUNNEL_URL"
+                    else
+                        echo "⚠️ Brave Browser not found. Opening in default browser..."
+                        open "$TUNNEL_URL"
+                    fi
+                else
+                    if command -v brave-browser &> /dev/null; then
+                        echo "🚀 Opening Brave Browser..."
+                        brave-browser "$TUNNEL_URL" &
+                    elif command -v brave &> /dev/null; then
+                        echo "🚀 Opening Brave Browser..."
+                        brave "$TUNNEL_URL" &
+                    else
+                        echo "⚠️ Brave Browser not found. Opening in default browser..."
+                        xdg-open "$TUNNEL_URL" &
+                    fi
+                fi
+                ;;
+            2)
+                # Open QR code
+                QR_URL="https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=$TUNNEL_URL"
+                if [ "$(uname)" == "Darwin" ]; then
+                    if [ -d "/Applications/Brave Browser.app" ]; then
+                        echo "🚀 Opening QR Code in Brave Browser..."
+                        open -a "Brave Browser" "$QR_URL"
+                    else
+                        open "$QR_URL"
+                    fi
+                else
+                    if command -v brave-browser &> /dev/null; then
+                        brave-browser "$QR_URL" &
+                    elif command -v brave &> /dev/null; then
+                        brave "$QR_URL" &
+                    else
+                        xdg-open "$QR_URL" &
+                    fi
+                fi
+                ;;
+            3)
+                # ADB
+                if ! command -v adb &> /dev/null; then
+                    echo "❌ ADB command not found in PATH."
+                else
+                    echo "🚀 Attempting to send URL to mobile via ADB..."
+                    adb shell am start -a android.intent.action.VIEW -d "$TUNNEL_URL"
+                fi
+                ;;
+            *)
+                echo "⏭️ Skipping URL sharing."
+                ;;
+        esac
+    fi
+
+    echo ""
     read -p "Press [Enter] at any time to stop the server and tunnel..."
     
     echo ""
