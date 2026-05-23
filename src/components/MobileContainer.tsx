@@ -510,7 +510,13 @@ export function MobileContainer() {
 
             {/* Volume bar */}
             <div className="flex items-center gap-3 bg-[#121318]/50 p-3 rounded-2xl border border-white/5">
-              <span className="text-xs text-gray-500 shrink-0">🔇</span>
+              <button 
+                onClick={() => setVolume(0)}
+                className="text-gray-500 hover:text-white transition active:scale-95 shrink-0 flex items-center justify-center"
+                title="Mute"
+              >
+                <Icon name="volume-mute" size={16} />
+              </button>
               <input 
                 type="range" 
                 min="0" 
@@ -520,7 +526,13 @@ export function MobileContainer() {
                 onChange={e => setVolume(parseFloat(e.target.value))} 
                 className="flex-1 h-1 bg-gray-800 rounded-full appearance-none accent-emerald-500 cursor-pointer"
               />
-              <span className="text-xs text-emerald-400 shrink-0">🔊</span>
+              <button 
+                onClick={() => setVolume(1)}
+                className="text-emerald-400 hover:text-emerald-300 transition active:scale-95 shrink-0 flex items-center justify-center"
+                title="Max Volume"
+              >
+                <Icon name="volume-up" size={16} />
+              </button>
             </div>
 
           </div>
