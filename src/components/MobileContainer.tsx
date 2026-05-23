@@ -68,9 +68,10 @@ function QueueItem({ file, idx, isActive, onRemove, onPlay, getGradient }: Queue
         className="absolute inset-y-0 right-0 bg-rose-600 flex items-center justify-end px-5 transition-all duration-200"
         style={{ width: `${Math.abs(offsetX)}px`, opacity: offsetX < -15 ? 1 : 0 }}
       >
-        <span className="text-white text-[10px] font-bold flex items-center gap-1 shrink-0">
-          🗑️ <span className={offsetX < -70 ? "scale-105 transition-transform" : ""}>삭제</span>
-        </span>
+        <div className="text-white text-[10px] font-bold flex items-center gap-1 shrink-0">
+          <Icon name="trash" size={13} className="text-white shrink-0 mr-1" />
+          <span className={offsetX < -70 ? "scale-105 transition-transform" : ""}>삭제</span>
+        </div>
       </div>
 
       {/* Foreground Swipable Item */}
