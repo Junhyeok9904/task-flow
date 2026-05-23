@@ -34,7 +34,7 @@ if "%mode%"=="1" goto PROD_MODE
 goto DEV_MODE
 
 :PROD_MODE
-set "prod_port=6000"
+set "prod_port=6001"
 
 :PORT_CHECK_LOOP
 netstat -ano | findstr /R /C:":%prod_port% " >nul 2>&1

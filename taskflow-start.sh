@@ -29,7 +29,7 @@ echo "2) Development Mode (Instant start, live reload)"
 read -p "Enter 1 or 2 [Default: 2]: " mode
 
 if [ "$mode" == "1" ]; then
-    prod_port=6000
+    prod_port=6001
     while true; do
         # Check if the port is in use using lsof or netstat
         if lsof -Pi :$prod_port -sTCP:LISTEN -t &>/dev/null || netstat -tuln 2>/dev/null | grep -q ":$prod_port "; then
