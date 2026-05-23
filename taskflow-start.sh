@@ -29,10 +29,12 @@ echo "2) Development Mode (Instant start, live reload)"
 read -p "Enter 1 or 2 [Default: 2]: " mode
 
 if [ "$mode" == "1" ]; then
+    read -p "Enter port for Production [Default: 4000]: " prod_port
+    prod_port=${prod_port:-4000}
     echo "🔨 Building Task-Flow..."
     npm run build
-    echo "🚀 Starting Task-Flow Production Server..."
-    npm run start
+    echo "🚀 Starting Task-Flow Production Server on port $prod_port..."
+    npx next start -p $prod_port
 else
     echo "🚀 Starting Task-Flow Development Server..."
     npm run dev
