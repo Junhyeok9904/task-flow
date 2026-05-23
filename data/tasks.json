@@ -4,7 +4,8 @@
     "title": "[기능] 미디어 플레이어 한 곡 반복 / 전체 반복 토글 구현",
     "description": "플레이바에 반복 재생 아이콘을 추가하고, 단일 곡 반복 및 전체 재생 목록 반복 상태를 원활하게 토글하는 제어 모듈을 구축합니다.",
     "status": "completed",
-    "checked": true
+    "checked": true,
+    "updatedAt": "2026-05-23T21:20:06.025Z"
   },
   {
     "id": "roadmap_task_2",
