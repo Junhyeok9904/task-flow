@@ -1013,8 +1013,8 @@ function HomeContent() {
             
             {/* Nav icons */}
             <div className="flex flex-col items-center gap-5 w-full mt-4">
-              <button onClick={() => { setView('songs'); setSelectedPlaylistId(null); }} className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-[#181b24] text-emerald-400 relative transition group">
-                <Icon name="home" size={20} />
+              <button onClick={() => { setView('songs'); setSelectedPlaylistId(null); }} className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-[#181b24] text-emerald-400 relative transition group" title="Library">
+                <Icon name="grid" size={20} />
                 <span className="absolute left-0 top-3 w-1 h-3 bg-emerald-500 rounded-r-md"></span>
               </button>
               

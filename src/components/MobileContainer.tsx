@@ -292,7 +292,7 @@ export function MobileContainer() {
           onClick={() => { router.push('/'); }}
           className={`flex flex-col items-center justify-center w-16 h-full transition relative ${isLibraryActive ? 'text-emerald-400' : 'text-gray-500'}`}
         >
-          <Icon name="home" size={20} />
+          <Icon name="grid" size={20} />
           <span className="text-[9px] font-bold mt-1 tracking-wider">Library</span>
           {isLibraryActive && (
             <span className="absolute bottom-1 w-1 h-1 bg-emerald-400 rounded-full"></span>
