@@ -150,6 +150,7 @@ export function useHomeState() {
     ...tunnelState,
     currentFolders: uniqueFolders,
     currentSongs,
+    sortedSongs,
     onDrop,
     handleUpload,
     currentFile,
