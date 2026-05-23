@@ -10,6 +10,7 @@ services:
       - "${PROD_PORT:-6001}:3000"
     volumes:
       - ./data:/app/data
+      - ./public/media:/app/public/media
     networks:
       - app-network
 
