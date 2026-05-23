@@ -336,9 +336,10 @@ export function MobileContainer() {
         </button>
       </nav>
 
-      {/* ─── iOS Style Full Screen Now Playing Sheet ─── */}
-      {currentFile && isMobilePlayerOpen && (
-        <div className="fixed inset-0 bg-[#07080b]/98 z-50 flex flex-col p-6 overflow-hidden select-none animate-slide-up">
+      {currentFile && (
+        <div className={`fixed inset-0 bg-[#07080b]/98 z-50 flex flex-col p-6 overflow-hidden select-none transition-all duration-500 ease-[cubic-bezier(0.32,0.94,0.6,1)] ${
+          isMobilePlayerOpen ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'
+        }`}>
           
           {/* Top Panel HUD */}
           <header className="flex justify-between items-center shrink-0 mb-6">
