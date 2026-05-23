@@ -29,8 +29,17 @@ echo "2) Development Mode (Instant start, live reload)"
 read -p "Enter 1 or 2 [Default: 2]: " mode
 
 if [ "$mode" == "1" ]; then
-    read -p "Enter port for Production [Default: 4000]: " prod_port
-    prod_port=${prod_port:-4000}
+    prod_port=6000
+    while true; do
+        # Check if the port is in use using lsof or netstat
+        if lsof -Pi :$prod_port -sTCP:LISTEN -t &>/dev/null || netstat -tuln 2>/dev/null | grep -q ":$prod_port "; then
+            echo "⚠️ Port $prod_port is in use. Checking next..."
+            prod_port=$((prod_port+1))
+        else
+            break
+        fi
+    done
+    echo "✅ Found available port for Production: $prod_port"
     echo "🔨 Building Task-Flow..."
     npm run build
     echo "🚀 Starting Task-Flow Production Server on port $prod_port..."

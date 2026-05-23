@@ -34,9 +34,18 @@ if "%mode%"=="1" goto PROD_MODE
 goto DEV_MODE
 
 :PROD_MODE
-set "prod_port=4000"
-set /p input_port="Enter port for Production [Default: 4000]: "
-if not "%input_port%"=="" set "prod_port=%input_port%"
+set "prod_port=6000"
+
+:PORT_CHECK_LOOP
+:: Look for exact port binding (with trailing space to avoid matching 60000 when checking 6000)
+netstat -ano | findstr /R /C:":%prod_port% " >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [!] Port %prod_port% is in use. Trying next port...
+    set /a prod_port+=1
+    goto PORT_CHECK_LOOP
+)
+
+echo [O] Found available port for Production: %prod_port%
 echo [!] Building Task-Flow...
 call npm run build
 echo [!] Starting Task-Flow Production Server on port %prod_port%...
