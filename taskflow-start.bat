@@ -37,7 +37,6 @@ goto DEV_MODE
 set "prod_port=6000"
 
 :PORT_CHECK_LOOP
-:: Look for exact port binding (with trailing space to avoid matching 60000 when checking 6000)
 netstat -ano | findstr /R /C:":%prod_port% " >nul 2>&1
 if %errorlevel% equ 0 (
     echo [!] Port %prod_port% is in use. Trying next port...
@@ -48,8 +47,33 @@ if %errorlevel% equ 0 (
 echo [O] Found available port for Production: %prod_port%
 echo [!] Building Task-Flow...
 call npm run build
-echo [!] Starting Task-Flow Production Server on port %prod_port%...
-call npx next start -p %prod_port%
+
+echo [!] Starting Task-Flow Production Server on port %prod_port% in background...
+start "Task-Flow Production Server" npx next start -p %prod_port%
+
+echo [!] Waiting for server to initialize (5s)...
+timeout /t 5 >nul
+
+echo [!] Starting Cloudflare Tunnel automatically...
+set "API_URL=http://localhost:%prod_port%/api/tunnel"
+for /f "delims=" %%j in ('curl -s -X POST "%API_URL%" -H "Content-Type: application/json" -d "{\"action\":\"start\"}" 2^>nul') do set START_RESP=%%j
+
+echo.
+echo ===========================================
+echo    Task-Flow Production URL and Tunnel Info
+echo ===========================================
+echo %START_RESP%
+echo ===========================================
+echo.
+echo Press [Enter] at any time to stop the server and tunnel...
+pause >nul
+
+echo.
+echo [!] Stopping Cloudflare Tunnel...
+curl -s -X POST "%API_URL%" -H "Content-Type: application/json" -d "{\"action\":\"stop\"}" >nul 2>nul
+echo [!] Stopping Next.js Server process...
+taskkill /FI "WINDOWTITLE eq Task-Flow Production Server*" >nul 2>nul
+echo [O] Cleanup complete.
 goto END
 
 :DEV_MODE

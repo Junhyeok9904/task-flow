@@ -42,8 +42,35 @@ if [ "$mode" == "1" ]; then
     echo "✅ Found available port for Production: $prod_port"
     echo "🔨 Building Task-Flow..."
     npm run build
-    echo "🚀 Starting Task-Flow Production Server on port $prod_port..."
-    npx next start -p $prod_port
+    
+    echo "🚀 Starting Task-Flow Production Server on port $prod_port in background..."
+    npx next start -p $prod_port &
+    SERVER_PID=$!
+    
+    echo "⏳ Waiting for server to initialize (5s)..."
+    sleep 5
+    
+    echo "☁️ Starting Cloudflare Tunnel automatically..."
+    API_URL="http://localhost:$prod_port/api/tunnel"
+    START_RESP=$(curl -s -X POST "$API_URL" -H "Content-Type: application/json" -d '{"action":"start"}' 2>/dev/null)
+    
+    echo ""
+    echo "==========================================="
+    echo "   Task-Flow Production URL and Tunnel Info"
+    echo "==========================================="
+    echo "$START_RESP"
+    echo "==========================================="
+    echo ""
+    
+    read -p "Press [Enter] at any time to stop the server and tunnel..."
+    
+    echo ""
+    echo "🛑 Stopping Cloudflare Tunnel..."
+    curl -s -X POST "$API_URL" -H "Content-Type: application/json" -d '{"action":"stop"}' &>/dev/null
+    
+    echo "🛑 Stopping Next.js Server process..."
+    kill $SERVER_PID
+    echo "✅ Cleanup complete."
 else
     echo "🚀 Starting Task-Flow Development Server..."
     npm run dev
