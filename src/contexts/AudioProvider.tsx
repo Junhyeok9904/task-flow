@@ -378,16 +378,20 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addToQueueNext = useCallback((file: MediaFile) => {
-    const { queue, isPlaying, currentFile } = stateRef.current;
-    const audio = getActiveAudio();
+    const { queue, currentFile } = stateRef.current;
     
-    // Determine if playback has naturally ended or if queue is empty
+    // Determine if queue is empty
     const isQueueEmpty = !queue.length || !currentFile;
-    const isFinished = !isPlaying && audio && (audio.ended || audio.currentTime === 0 || audio.currentTime >= audio.duration);
 
-    if (isQueueEmpty || isFinished) {
-      // If empty or finished, play immediately
-      playFile(file);
+    if (isQueueEmpty) {
+      setQueue([file]);
+      setCurrentFile(file);
+      setQueueIndex(0);
+      
+      const activeAudio = getActiveAudio();
+      if (activeAudio) {
+        activeAudio.src = file.path;
+      }
       return;
     }
 
@@ -401,19 +405,23 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
       return newQueue;
     });
-  }, [playFile]);
+  }, []);
 
   const addToQueueEnd = useCallback((file: MediaFile) => {
-    const { queue, isPlaying, currentFile } = stateRef.current;
-    const audio = getActiveAudio();
+    const { queue, currentFile } = stateRef.current;
     
-    // Determine if playback has naturally ended or if queue is empty
+    // Determine if queue is empty
     const isQueueEmpty = !queue.length || !currentFile;
-    const isFinished = !isPlaying && audio && (audio.ended || audio.currentTime === 0 || audio.currentTime >= audio.duration);
 
-    if (isQueueEmpty || isFinished) {
-      // If empty or finished, play immediately
-      playFile(file);
+    if (isQueueEmpty) {
+      setQueue([file]);
+      setCurrentFile(file);
+      setQueueIndex(0);
+      
+      const activeAudio = getActiveAudio();
+      if (activeAudio) {
+        activeAudio.src = file.path;
+      }
       return;
     }
 
@@ -427,7 +435,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
       return newQueue;
     });
-  }, [playFile]);
+  }, []);
 
   const removeFromQueue = useCallback((indexToRemove: number) => {
     const { queue, queueIndex, repeatMode } = stateRef.current;
