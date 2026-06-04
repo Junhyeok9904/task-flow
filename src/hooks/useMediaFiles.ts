@@ -28,6 +28,28 @@ export function useMediaFiles(
   const [sortBy, setSortBy] = useState<'name' | 'size' | 'added'>('added');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
+  // Load initial sorting state from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedSortBy = localStorage.getItem('tf_sort_by') as 'name' | 'size' | 'added' | null;
+      const savedSortOrder = localStorage.getItem('tf_sort_order') as 'asc' | 'desc' | null;
+      if (savedSortBy) setSortBy(savedSortBy);
+      if (savedSortOrder) setSortOrder(savedSortOrder);
+    } catch (e) {
+      console.error("Failed to load sorting preferences:", e);
+    }
+  }, []);
+
+  // Save sorting state to localStorage when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('tf_sort_by', sortBy);
+      localStorage.setItem('tf_sort_order', sortOrder);
+    } catch (e) {
+      console.error("Failed to save sorting preferences:", e);
+    }
+  }, [sortBy, sortOrder]);
+
   const handleSortChange = useCallback((field: 'name' | 'size' | 'added') => {
     if (sortBy === field) {
       setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
