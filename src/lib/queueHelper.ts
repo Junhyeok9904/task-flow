@@ -124,3 +124,47 @@ export function removeTrackFromQueue(
     shouldPlayNext
   };
 }
+
+/**
+ * Inserts a file at the end of the queue.
+ * Handles removing duplicates of the file from other positions in the queue
+ * and shifts the active index if needed.
+ * 
+ * @param queue Current list of tracks in the queue
+ * @param currentFile The currently playing MediaFile
+ * @param queueIndex The index of the currently playing track in the queue
+ * @param fileToInsert The MediaFile to be queued at the end
+ */
+export function insertAtQueueEnd(
+  queue: MediaFile[],
+  currentFile: MediaFile | null,
+  queueIndex: number,
+  fileToInsert: MediaFile
+): { newQueue: MediaFile[]; newQueueIndex: number } {
+  // If queue is empty, return it as the only element
+  if (queue.length === 0) {
+    return { newQueue: [fileToInsert], newQueueIndex: 0 };
+  }
+
+  // Remove existing occurrences of fileToInsert to prevent duplicates
+  const filtered = queue.filter(f => f.path !== fileToInsert.path);
+
+  // Index of currently playing file in filtered list
+  let newCurrentIndex = queueIndex;
+  if (currentFile) {
+    newCurrentIndex = filtered.findIndex(f => f.path === currentFile.path);
+    if (newCurrentIndex === -1) {
+      newCurrentIndex = Math.min(Math.max(0, queueIndex), filtered.length);
+    }
+  } else {
+    newCurrentIndex = Math.min(Math.max(0, queueIndex), filtered.length);
+  }
+
+  const newQueue = [...filtered, fileToInsert];
+
+  return {
+    newQueue,
+    newQueueIndex: newCurrentIndex
+  };
+}
+

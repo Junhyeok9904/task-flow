@@ -8,6 +8,7 @@ interface PlaylistTrackItemProps {
   onPlay: () => void;
   onMenuClick: (e: React.MouseEvent, track: MediaFile) => void;
   addToQueueNext: (file: MediaFile) => void;
+  addToQueueEnd: (file: MediaFile) => void;
   showToast: (msg: string) => void;
 }
 
@@ -16,11 +17,12 @@ export function PlaylistTrackItem({
   onPlay,
   onMenuClick,
   addToQueueNext,
+  addToQueueEnd,
   showToast
 }: PlaylistTrackItemProps) {
   const { translateX, isSwiping, touchHandlers } = useSwipeToQueue(item, () => {
-    addToQueueNext(item);
-    showToast(`'${item.name.split('/').pop()}'이(가) 대기열에 추가되었습니다.`);
+    addToQueueEnd(item);
+    showToast(`'${item.name.split('/').pop()}'이(가) 대기열 마지막에 추가되었습니다.`);
   });
 
   return (

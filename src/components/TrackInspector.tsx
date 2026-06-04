@@ -13,6 +13,9 @@ interface TrackInspectorProps {
   isPlaylistDropdownOpen: boolean;
   setIsPlaylistDropdownOpen: (val: boolean) => void;
   handleAddTrack: (playlistId: string, playlistName: string, track: MediaFile) => void;
+  addToQueueNext: (file: MediaFile) => void;
+  addToQueueEnd: (file: MediaFile) => void;
+  showToast: (message: string) => void;
 }
 
 export function TrackInspector({
@@ -22,7 +25,10 @@ export function TrackInspector({
   playlists,
   isPlaylistDropdownOpen,
   setIsPlaylistDropdownOpen,
-  handleAddTrack
+  handleAddTrack,
+  addToQueueNext,
+  addToQueueEnd,
+  showToast
 }: TrackInspectorProps) {
   if (!selectedTrack) {
     return (
@@ -113,13 +119,22 @@ export function TrackInspector({
         <div className="flex gap-2">
           <button
             onClick={() => playFile(selectedTrack)}
-            className="flex-1 py-2 bg-[#12131a] hover:bg-[#181b24] text-white rounded-xl text-xs font-bold transition border border-gray-800 flex items-center justify-center gap-1.5"
+            className="flex-1 py-2 bg-[#12131a] hover:bg-[#181b24] text-white rounded-xl text-xs font-bold transition border border-gray-800 flex items-center justify-center gap-1.5 active:scale-95"
           >
             <Icon name="play" size={14} className="fill-white/10" /> Play
           </button>
           <button
+             onClick={() => {
+               addToQueueEnd(selectedTrack);
+               showToast(`'${selectedTrack.name.split('/').pop()}'이(가) 대기열 마지막에 추가되었습니다.`);
+             }}
+            className="flex-1 py-2 bg-[#12131a] hover:bg-[#181b24] hover:text-teal-400 text-white rounded-xl text-xs font-bold transition border border-gray-800 flex items-center justify-center gap-1.5 active:scale-95"
+          >
+            <Icon name="plus" size={14} /> Queue
+          </button>
+          <button
             onClick={() => deleteFile(selectedTrack.name)}
-            className="px-3 py-2 bg-[#12131a] hover:bg-rose-950/20 hover:text-rose-400 border border-gray-800 text-gray-500 rounded-xl text-xs transition flex items-center justify-center gap-1.5"
+            className="px-3 py-2 bg-[#12131a] hover:bg-rose-950/20 hover:text-rose-400 border border-gray-800 text-gray-500 rounded-xl text-xs transition flex items-center justify-center gap-1.5 active:scale-95"
           >
             <Icon name="trash" size={14} /> Delete
           </button>

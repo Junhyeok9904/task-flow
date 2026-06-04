@@ -26,6 +26,21 @@ export function useMediaFiles(
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'size' | 'added'>('added');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  const handleSortChange = useCallback((field: 'name' | 'size' | 'added') => {
+    if (sortBy === field) {
+      setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(field);
+      if (field === 'name') {
+        setSortOrder('asc');
+      } else {
+        setSortOrder('desc');
+      }
+    }
+  }, [sortBy]);
+
   const [activeFilterTag, setActiveFilterTag] = useState<'all' | 'audio' | 'video'>('all');
   const [currentFolder, setCurrentFolder] = useState('');
   const [selectedTracksList, setSelectedTracksList] = useState<string[]>([]);
@@ -153,6 +168,7 @@ export function useMediaFiles(
 
   return {
     mediaFiles, loading, error, search, setSearch, sortBy, setSortBy,
+    sortOrder, setSortOrder, handleSortChange,
     activeFilterTag, setActiveFilterTag, currentFolder, setCurrentFolder,
     selectedTracksList, setSelectedTracksList, selectedTrack, setSelectedTrack,
     loadData, deleteFile, deleteSelectedTracks, toggleSelectTrack

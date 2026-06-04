@@ -8,6 +8,7 @@ import { useAudioPlayer } from '../contexts/AudioProvider';
 import { useMediaFiles } from './useMediaFiles';
 import { usePlaylistActions } from './usePlaylistActions';
 import { useTunnelState } from './useTunnelState';
+import { sortSongs } from '../lib/sortHelper';
 
 export function useHomeState() {
   const { enqueueFiles, tasks } = useUpload();
@@ -26,7 +27,7 @@ export function useHomeState() {
   const [contextMenu, setContextMenu] = useState<{ track: MediaFile; x: number; y: number } | null>(null);
 
   const audioPlayer = useAudioPlayer();
-  const { currentFile, playFile, addToQueueNext, showToast } = audioPlayer;
+  const { currentFile, playFile, addToQueueNext, addToQueueEnd, showToast } = audioPlayer;
 
   useEffect(() => {
     if (queryView && ['songs', 'playlists', 'upload', 'recent'].includes(queryView)) {
@@ -89,11 +90,7 @@ export function useHomeState() {
     return parts.length > 1 ? parts.slice(0, -1).join('/') : '';
   }, []);
 
-  const sortedSongs = [...mediaFiles].sort((a, b) => {
-    if (mediaFilesState.sortBy === 'name') return a.name.localeCompare(b.name);
-    if (mediaFilesState.sortBy === 'size') return (b.size || 0) - (a.size || 0);
-    return new Date(b.addedAt || 0).getTime() - new Date(a.addedAt || 0).getTime();
-  });
+  const sortedSongs = sortSongs(mediaFiles, mediaFilesState.sortBy, mediaFilesState.sortOrder);
 
   const currentFolders = sortedSongs
     .map(s => getParentFolder(s.path))
@@ -156,6 +153,7 @@ export function useHomeState() {
     currentFile,
     playFile,
     addToQueueNext,
+    addToQueueEnd,
     showToast
   };
 }

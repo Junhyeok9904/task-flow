@@ -20,6 +20,7 @@ interface PlaylistsViewProps {
   playFile: (file: MediaFile) => void;
   handleMenuClick: (e: React.MouseEvent, track: MediaFile) => void;
   addToQueueNext: (file: MediaFile) => void;
+  addToQueueEnd: (file: MediaFile) => void;
   showToast: (msg: string) => void;
 }
 
@@ -38,6 +39,7 @@ export function PlaylistsView({
   playFile,
   handleMenuClick,
   addToQueueNext,
+  addToQueueEnd,
   showToast
 }: PlaylistsViewProps) {
   return (
@@ -117,6 +119,7 @@ export function PlaylistsView({
                             onPlay={() => playFile(item)}
                             onMenuClick={handleMenuClick}
                             addToQueueNext={addToQueueNext}
+                            addToQueueEnd={addToQueueEnd}
                             showToast={showToast}
                           />
                         ))

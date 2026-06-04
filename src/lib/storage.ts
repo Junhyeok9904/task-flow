@@ -86,7 +86,10 @@ export async function saveFileStream(file: File, filename: string): Promise<Stor
   }
 
 
-  const targetPath = path.join(MEDIA_DIR, filename);
+  const targetPath = path.resolve(path.join(MEDIA_DIR, filename));
+  if (!targetPath.startsWith(path.resolve(MEDIA_DIR))) {
+    throw new Error('Invalid file path: path traversal detected');
+  }
   
   // Ensure target directory exists for nested folder uploads
   const targetDir = path.dirname(targetPath);
@@ -193,7 +196,10 @@ export async function extractMetadata(
  * 미디어 파일과 연관된 커버아트를 함께 삭제합니다.
  */
 export async function deleteMediaFile(filename: string, mediaId?: string): Promise<boolean> {
-  const targetPath = path.join(MEDIA_DIR, filename);
+  const targetPath = path.resolve(path.join(MEDIA_DIR, filename));
+  if (!targetPath.startsWith(path.resolve(MEDIA_DIR))) {
+    throw new Error('Invalid file path: path traversal detected');
+  }
 
   try {
     await fsp.access(targetPath);

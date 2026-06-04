@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     }
 
     const folder = formData.get('folder') as string | null;
-    let filename = file.name;
+    let filename = path.basename(file.name);
     if (folder) {
       // Clean folder path to prevent path traversal (e.g. removing ..)
       const cleanFolder = folder.replace(/\.\./g, '').replace(/^\/+|\/+$/g, '');
@@ -162,6 +162,9 @@ export async function DELETE(request: Request) {
     let deletedCount = 0;
 
     for (const filename of filenames) {
+      if (filename.includes('..') || path.isAbsolute(filename)) {
+        return NextResponse.json({ error: 'Invalid filename: path traversal attempted' }, { status: 400 });
+      }
       const mediaItem = allMedia.find(m => m.name === filename);
       const mediaId = mediaItem?.id;
       const deleted = await deleteMediaFile(filename, mediaId);

@@ -22,6 +22,7 @@ interface PlaylistExplorerSidebarProps {
   toggleTunnel: () => void;
   showAlert: (title: string, msg: string, isDanger?: boolean) => void;
   currentFile: MediaFile | null;
+  isDocker?: boolean;
 }
 
 export function PlaylistExplorerSidebar({
@@ -40,7 +41,8 @@ export function PlaylistExplorerSidebar({
   tunnelLoading,
   toggleTunnel,
   showAlert,
-  currentFile
+  currentFile,
+  isDocker = false
 }: PlaylistExplorerSidebarProps) {
   return (
     <aside className="hidden md:flex w-64 bg-[#0a0b10]/60 backdrop-blur-xl border-r border-white/5 flex-col shrink-0 z-10 shadow-[4px_0_24px_rgba(0,0,0,0.3)]">
@@ -168,7 +170,9 @@ export function PlaylistExplorerSidebar({
       <div className="p-4 border-t border-white/5 bg-black/20 space-y-2.5">
         <div className="flex items-center justify-between text-[10px] text-gray-500 uppercase font-semibold">
           <span>Public Access</span>
-          {isTunneling ? (
+          {isDocker ? (
+            <span className="text-emerald-400 text-xs animate-pulse">☁️ Docker Active</span>
+          ) : isTunneling ? (
             <span className="text-emerald-400 text-xs animate-pulse">☁️ Connected</span>
           ) : (
             <span className="text-gray-600 text-xs">☁️ Offline</span>
@@ -177,14 +181,16 @@ export function PlaylistExplorerSidebar({
         
         <button
           onClick={toggleTunnel}
-          disabled={tunnelLoading}
+          disabled={tunnelLoading || isDocker}
           className={`w-full py-2 rounded-lg text-xs font-bold transition-all border ${
-            isTunneling
-              ? 'bg-rose-500/10 text-rose-400 border-rose-500/30 hover:bg-rose-500/20'
-              : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
+            isDocker
+              ? 'bg-emerald-500/5 text-emerald-400/50 border-emerald-500/10 cursor-not-allowed'
+              : isTunneling
+                ? 'bg-rose-500/10 text-rose-400 border-rose-500/30 hover:bg-rose-500/20'
+                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
           } ${tunnelLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
-          {tunnelLoading ? 'Wait...' : isTunneling ? 'Stop Tunnel' : 'Start Public Tunnel'}
+          {isDocker ? 'Managed by Docker' : tunnelLoading ? 'Wait...' : isTunneling ? 'Stop Tunnel' : 'Start Public Tunnel'}
         </button>
         
         {isTunneling && tunnelUrl && (

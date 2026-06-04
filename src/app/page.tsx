@@ -64,6 +64,7 @@ function HomeContent() {
           toggleTunnel={state.toggleTunnel}
           showAlert={state.showAlert}
           currentFile={state.currentFile}
+          isDocker={state.isDocker}
         />
 
         <main className="flex-1 flex flex-col overflow-hidden bg-[#0b0c10]" onDragOver={e => { e.preventDefault(); state.setDragOver(true); }} onDragLeave={() => state.setDragOver(false)} onDrop={state.onDrop}>
@@ -80,6 +81,9 @@ function HomeContent() {
             isPlaylistDropdownOpen={state.isPlaylistDropdownOpen}
             setIsPlaylistDropdownOpen={state.setIsPlaylistDropdownOpen}
             handleAddTrack={state.handleAddTrack}
+            addToQueueNext={state.addToQueueNext}
+            addToQueueEnd={state.addToQueueEnd}
+            showToast={state.showToast}
           />
         </aside>
       </div>

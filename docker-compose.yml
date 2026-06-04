@@ -10,6 +10,8 @@ services:
     volumes:
       - ./data:/app/data
       - ./public/media:/app/public/media
+    environment:
+      - IS_DOCKER=true
     networks:
       - app-network
 

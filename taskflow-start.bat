@@ -1,4 +1,6 @@
 @echo off
+setlocal EnableDelayedExpansion
+chcp 65001 >nul
 title Task-Flow Portable
 echo ===========================================
 echo    Task-Flow Portable Startup Script (Windows)  
@@ -90,12 +92,14 @@ echo Select tunnel URL sharing option:
 echo 1) Open URL in Brave Browser (PC) to use Brave Sync/Send-to-device
 echo 2) Open QR Code image in Browser (Scan with Mobile Camera)
 echo 3) Send directly to connected Android Mobile (via ADB)
-echo 4) Skip sharing [Default: 4]
-set /p share_choice="Enter choice (1-4): "
+echo 4) Send to Discord (via Webhook)
+echo 5) Skip sharing [Default: 5]
+set /p share_choice="Enter choice (1-5): "
 
 if "%share_choice%"=="1" goto SHARE_BRAVE
 if "%share_choice%"=="2" goto SHARE_QR
 if "%share_choice%"=="3" goto SHARE_ADB
+if "%share_choice%"=="4" goto SHARE_DISCORD
 goto SHARE_SKIP
 
 :SHARE_BRAVE
@@ -139,6 +143,41 @@ if %errorlevel% neq 0 (
     echo [!] Attempting to send URL to mobile via ADB...
     adb shell am start -a android.intent.action.VIEW -d "%TUNNEL_URL%"
 )
+goto SHARE_SKIP
+
+:SHARE_DISCORD
+set "ENV_FILE=%~dp0.env"
+set "DISCORD_WEBHOOK="
+if exist "%ENV_FILE%" (
+    for /f "usebackq tokens=1,2 delims==" %%i in ("%ENV_FILE%") do (
+        if "%%i"=="DISCORD_WEBHOOK_URL" set "DISCORD_WEBHOOK=%%j"
+    )
+)
+if not defined DISCORD_WEBHOOK (
+    echo [!] Discord Webhook URL not configured in .env.
+    echo [!] Please paste your Discord Webhook URL below.
+    echo [!] To get one: Discord Server Settings ^> Integrations ^> Webhooks ^> New Webhook ^> Copy URL
+    set /p DISCORD_WEBHOOK="Webhook URL: "
+    if defined DISCORD_WEBHOOK (
+        if not exist "%ENV_FILE%" (
+            echo DISCORD_WEBHOOK_URL=!DISCORD_WEBHOOK!> "%ENV_FILE%"
+        ) else (
+            findstr /I "DISCORD_WEBHOOK_URL" "%ENV_FILE%" >nul
+            if !errorlevel! neq 0 (
+                echo.>> "%ENV_FILE%"
+                echo DISCORD_WEBHOOK_URL=!DISCORD_WEBHOOK!>> "%ENV_FILE%"
+            )
+        )
+        echo [O] Webhook URL saved to .env
+    )
+)
+if not defined DISCORD_WEBHOOK (
+    echo [X] Webhook URL is empty. Skipping.
+    goto SHARE_SKIP
+)
+echo [!] Sending tunnel URL to Discord...
+curl -s -H "Content-Type: application/json" -d "{\"content\":\"🚀 **Task-Flow Production Server Started**\n🔗 %TUNNEL_URL%\"}" "%DISCORD_WEBHOOK%" >nul 2>nul
+echo [O] Tunnel URL sent to Discord!
 goto SHARE_SKIP
 
 :SHARE_SKIP
@@ -239,12 +278,14 @@ echo Select tunnel URL sharing option:
 echo 1) Open URL in Brave Browser (PC) to use Brave Sync/Send-to-device
 echo 2) Open QR Code image in Browser (Scan with Mobile Camera)
 echo 3) Send directly to connected Android Mobile (via ADB)
-echo 4) Skip sharing [Default: 4]
-set /p share_choice="Enter choice (1-4): "
+echo 4) Send to Discord (via Webhook)
+echo 5) Skip sharing [Default: 5]
+set /p share_choice="Enter choice (1-5): "
 
 if "%share_choice%"=="1" goto DOCKER_SHARE_BRAVE
 if "%share_choice%"=="2" goto DOCKER_SHARE_QR
 if "%share_choice%"=="3" goto DOCKER_SHARE_ADB
+if "%share_choice%"=="4" goto DOCKER_SHARE_DISCORD
 goto DOCKER_SHARE_SKIP
 
 :DOCKER_SHARE_BRAVE
@@ -288,6 +329,41 @@ if %errorlevel% neq 0 (
     echo [!] Attempting to send URL to mobile via ADB...
     adb shell am start -a android.intent.action.VIEW -d "%TUNNEL_URL%"
 )
+goto DOCKER_SHARE_SKIP
+
+:DOCKER_SHARE_DISCORD
+set "ENV_FILE=%~dp0.env"
+set "DISCORD_WEBHOOK="
+if exist "%ENV_FILE%" (
+    for /f "usebackq tokens=1,2 delims==" %%i in ("%ENV_FILE%") do (
+        if "%%i"=="DISCORD_WEBHOOK_URL" set "DISCORD_WEBHOOK=%%j"
+    )
+)
+if not defined DISCORD_WEBHOOK (
+    echo [!] Discord Webhook URL not configured in .env.
+    echo [!] Please paste your Discord Webhook URL below.
+    echo [!] To get one: Discord Server Settings ^> Integrations ^> Webhooks ^> New Webhook ^> Copy URL
+    set /p DISCORD_WEBHOOK="Webhook URL: "
+    if defined DISCORD_WEBHOOK (
+        if not exist "%ENV_FILE%" (
+            echo DISCORD_WEBHOOK_URL=!DISCORD_WEBHOOK!> "%ENV_FILE%"
+        ) else (
+            findstr /I "DISCORD_WEBHOOK_URL" "%ENV_FILE%" >nul
+            if !errorlevel! neq 0 (
+                echo.>> "%ENV_FILE%"
+                echo DISCORD_WEBHOOK_URL=!DISCORD_WEBHOOK!>> "%ENV_FILE%"
+            )
+        )
+        echo [O] Webhook URL saved to .env
+    )
+)
+if not defined DISCORD_WEBHOOK (
+    echo [X] Webhook URL is empty. Skipping.
+    goto DOCKER_SHARE_SKIP
+)
+echo [!] Sending tunnel URL to Discord...
+curl -s -H "Content-Type: application/json" -d "{\"content\":\"🚀 **Task-Flow Production Server Started (Docker)**\n🔗 %TUNNEL_URL%\"}" "%DISCORD_WEBHOOK%" >nul 2>nul
+echo [O] Tunnel URL sent to Discord!
 goto DOCKER_SHARE_SKIP
 
 :DOCKER_SHARE_SKIP

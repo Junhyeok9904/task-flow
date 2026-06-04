@@ -6,8 +6,10 @@ export function useTunnelState() {
   const [tunnelUrl, setTunnelUrl] = useState<string | null>(null);
   const [isTunneling, setIsTunneling] = useState(false);
   const [tunnelLoading, setTunnelLoading] = useState(false);
+  const [isDocker, setIsDocker] = useState(false);
 
   const toggleTunnel = useCallback(async () => {
+    if (isDocker) return; // Block tunnel toggle in docker mode
     setTunnelLoading(true);
     try {
       if (isTunneling) {
@@ -26,12 +28,13 @@ export function useTunnelState() {
       console.error(e);
     }
     setTunnelLoading(false);
-  }, [isTunneling]);
+  }, [isTunneling, isDocker]);
 
   useEffect(() => {
     fetch('/api/tunnel', { method: 'POST', body: JSON.stringify({ action: 'status' }) })
       .then(r => r.json())
       .then(d => {
+        setIsDocker(!!d.isDocker);
         if (d.url) {
           setTunnelUrl(d.url);
           setIsTunneling(true);
@@ -44,6 +47,7 @@ export function useTunnelState() {
     tunnelUrl,
     isTunneling,
     tunnelLoading,
-    toggleTunnel
+    toggleTunnel,
+    isDocker
   };
 }

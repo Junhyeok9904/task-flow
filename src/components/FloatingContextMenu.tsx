@@ -10,6 +10,7 @@ interface FloatingContextMenuProps {
   playlists: Playlist[];
   onClose: () => void;
   addToQueueNext: (file: MediaFile) => void;
+  addToQueueEnd: (file: MediaFile) => void;
   showToast: (msg: string) => void;
   deleteFile: (filename: string) => void;
   onAddTrackToPlaylist: (playlistId: string, playlistName: string, track: MediaFile) => void;
@@ -22,6 +23,7 @@ export function FloatingContextMenu({
   playlists,
   onClose,
   addToQueueNext,
+  addToQueueEnd,
   showToast,
   deleteFile,
   onAddTrackToPlaylist
@@ -45,13 +47,25 @@ export function FloatingContextMenu({
         <button
           onClick={() => {
             addToQueueNext(track);
-            showToast(`'${track.name.split('/').pop()}'이(가) 대기열에 추가되었습니다.`);
+            showToast(`'${track.name.split('/').pop()}'이(가) 대기열 바로 다음에 추가되었습니다.`);
             onClose();
           }}
           className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-white/5 text-gray-300 hover:text-white transition flex items-center gap-2"
         >
-          <Icon name="plus" size={14} />
+          <Icon name="plus" size={14} className="text-teal-400" />
           대기열 바로 다음에 추가
+        </button>
+
+        <button
+          onClick={() => {
+            addToQueueEnd(track);
+            showToast(`'${track.name.split('/').pop()}'이(가) 대기열 마지막에 추가되었습니다.`);
+            onClose();
+          }}
+          className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-white/5 text-gray-300 hover:text-white transition flex items-center gap-2"
+        >
+          <Icon name="plus" size={14} className="text-emerald-400" />
+          대기열 마지막에 추가
         </button>
 
         <div 

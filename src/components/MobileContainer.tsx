@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAudioPlayer } from '../contexts/AudioProvider';
 import { Icon } from './ui/Icon';
@@ -18,7 +18,7 @@ interface QueueItemProps {
   idx: number;
   isActive: boolean;
   onRemove: (index: number) => void;
-  onPlay: (file: MediaFile) => void;
+  onPlay: () => void;
   getGradient: (title: string) => string;
 }
 
@@ -79,7 +79,7 @@ function QueueItem({ file, idx, isActive, onRemove, onPlay, getGradient }: Queue
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        onClick={() => onPlay(file)}
+        onClick={onPlay}
         className={`flex items-center justify-between p-2.5 cursor-pointer select-none active:bg-white/5 ${
           isActive ? 'bg-emerald-500/10 border-l-4 border-l-emerald-500' : ''
         }`}
@@ -146,6 +146,7 @@ export function MobileContainer() {
     toggleRepeat,
     toast,
     showToast,
+    playFromQueue,
     removeFromQueue,
   } = useAudioPlayer();
 
@@ -154,6 +155,37 @@ export function MobileContainer() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [isAddToPlaylistOpen, setIsAddToPlaylistOpen] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'nowplaying' | 'queue'>('nowplaying');
+
+  // Swipe-to-close gestures for full screen player
+  const touchStartY = useRef<number | null>(null);
+  const touchStartX = useRef<number | null>(null);
+  const [swipeOffsetY, setSwipeOffsetY] = useState(0);
+
+  const handlePlayerTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handlePlayerTouchMove = (e: React.TouchEvent) => {
+    if (touchStartY.current === null || touchStartX.current === null) return;
+    const currentY = e.touches[0].clientY;
+    const currentX = e.touches[0].clientX;
+    const diffY = currentY - touchStartY.current;
+    const diffX = currentX - touchStartX.current;
+
+    if (diffY > 0 && Math.abs(diffY) > Math.abs(diffX)) {
+      setSwipeOffsetY(diffY);
+    }
+  };
+
+  const handlePlayerTouchEnd = () => {
+    if (swipeOffsetY > 85) {
+      setIsMobilePlayerOpen(false);
+    }
+    touchStartY.current = null;
+    touchStartX.current = null;
+    setSwipeOffsetY(0);
+  };
 
   // Fetch playlists for add-to-playlist bottom sheet
   const loadPlaylists = async () => {
@@ -337,9 +369,20 @@ export function MobileContainer() {
       </nav>
 
       {currentFile && (
-        <div className={`fixed inset-0 bg-[#07080b]/98 z-50 flex flex-col p-6 overflow-hidden select-none transition-all duration-500 ease-[cubic-bezier(0.32,0.94,0.6,1)] ${
-          isMobilePlayerOpen ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'
-        }`}>
+        <div 
+          onTouchStart={handlePlayerTouchStart}
+          onTouchMove={handlePlayerTouchMove}
+          onTouchEnd={handlePlayerTouchEnd}
+          style={{
+            transform: isMobilePlayerOpen 
+              ? `translateY(${swipeOffsetY}px)` 
+              : 'translateY(100%)',
+            transition: touchStartY.current !== null ? 'none' : 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.4s'
+          }}
+          className={`fixed inset-0 bg-[#07080b]/98 z-50 flex flex-col p-6 overflow-hidden select-none ${
+            isMobilePlayerOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
+        >
           
           {/* Top Panel HUD */}
           <header className="flex justify-between items-center shrink-0 mb-6">
@@ -403,7 +446,7 @@ export function MobileContainer() {
                         idx={idx}
                         isActive={idx === queueIndex}
                         onRemove={removeFromQueue}
-                        onPlay={playFile}
+                        onPlay={() => playFromQueue(idx)}
                         getGradient={getGradientFromTitle}
                       />
                     ))

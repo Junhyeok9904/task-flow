@@ -20,7 +20,16 @@ export async function POST(request: Request) {
     }
 
     if (action === 'status') {
-      const res = getTunnelStatus();
+      let res: { status: string; url?: string | null; isDocker?: boolean } = getTunnelStatus();
+      res.isDocker = process.env.IS_DOCKER === 'true';
+
+      if (res.status === 'stopped') {
+        const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
+        if (host && host.includes('trycloudflare.com')) {
+          res.status = 'running';
+          res.url = `https://${host}`;
+        }
+      }
       return NextResponse.json(res);
     }
 

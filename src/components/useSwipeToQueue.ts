@@ -1,7 +1,9 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { MediaFile } from '../types';
+import { useAudioPlayer } from '../contexts/AudioProvider';
 
 export function useSwipeToQueue(track: MediaFile, onSwipeSuccess: () => void) {
+  const { unlockAudioDevice } = useAudioPlayer();
   const [translateX, setTranslateX] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
   const startXRef = useRef(0);
@@ -53,6 +55,7 @@ export function useSwipeToQueue(track: MediaFile, onSwipeSuccess: () => void) {
 
     if (horizontalLockRef.current) {
       if (translateXRef.current > 80) {
+        unlockAudioDevice();
         onSwipeSuccess();
       }
     }

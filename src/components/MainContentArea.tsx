@@ -31,6 +31,7 @@ interface MainContentAreaProps {
   playFile: (file: MediaFile) => void;
   handleMenuClick: (e: React.MouseEvent, track: MediaFile) => void;
   addToQueueNext: (file: MediaFile) => void;
+  addToQueueEnd: (file: MediaFile) => void;
   showToast: (msg: string) => void;
   playlists: Playlist[];
   deleteFile: (filename: string) => void;
@@ -47,6 +48,11 @@ interface MainContentAreaProps {
   setDragOver: (val: boolean) => void;
   onDrop: (e: React.DragEvent) => void;
   handleUpload: (files: FileList | null) => void;
+  sortBy: 'name' | 'size' | 'added';
+  setSortBy: (val: 'name' | 'size' | 'added') => void;
+  sortOrder: 'asc' | 'desc';
+  handleSortChange: (val: 'name' | 'size' | 'added') => void;
+  toggleSelectTrack: (path: string) => void;
 }
 
 export function MainContentArea(props: MainContentAreaProps) {
@@ -55,10 +61,11 @@ export function MainContentArea(props: MainContentAreaProps) {
     selectedTracksList, setSelectedTracksList, deleteSelectedTracks,
     currentFolder, setCurrentFolder, currentFolders, currentSongs, sortedSongs,
     selectedTrack, setSelectedTrack, isPlaying, currentFile, playFile,
-    handleMenuClick, addToQueueNext, showToast, playlists, deleteFile,
+    handleMenuClick, addToQueueNext, addToQueueEnd, showToast, playlists, deleteFile,
     createPlaylist, deletePlaylist, newPlaylistName, setNewPlaylistName,
     selectedPlaylistId, setSelectedPlaylistId, playPlaylistRewrite,
-    playPlaylistAppend, togglePlaylistItem, dragOver, setDragOver, onDrop, handleUpload
+    playPlaylistAppend, togglePlaylistItem, dragOver, setDragOver, onDrop, handleUpload,
+    sortBy, setSortBy, sortOrder, handleSortChange, toggleSelectTrack
   } = props;
 
   const getParentFolder = (filePath: string) => {
@@ -91,13 +98,27 @@ export function MainContentArea(props: MainContentAreaProps) {
         </div>
         
         <div className="hidden sm:flex gap-2 text-[10px] font-semibold text-gray-400">
-          {['Tags ∨', 'Upload Date ∨', 'Bitrate ∨'].map(txt => (
-            <div
-              key={txt}
-              className="px-2 py-1 bg-[#12131a] hover:bg-[#181b24] border border-gray-800 rounded-lg cursor-pointer transition"
+          {[
+            { id: 'name', label: 'Name' },
+            { id: 'added', label: 'Upload Date' },
+            { id: 'size', label: 'Size' }
+          ].map(opt => (
+            <button
+              key={opt.id}
+              onClick={() => handleSortChange(opt.id as any)}
+              className={`px-2.5 py-1 border rounded-lg cursor-pointer transition flex items-center gap-1 ${
+                sortBy === opt.id
+                  ? 'bg-[#1b2f28] text-emerald-400 border-emerald-500/40 shadow-[0_0_8px_rgba(16,185,129,0.06)]'
+                  : 'bg-[#12131a] text-gray-400 border-gray-800 hover:bg-[#181b24]'
+              }`}
             >
-              {txt}
-            </div>
+              <span>{opt.label}</span>
+              {sortBy === opt.id && (
+                <span className="text-emerald-400 font-extrabold">
+                  {sortOrder === 'asc' ? '▲' : '▼'}
+                </span>
+              )}
+            </button>
           ))}
         </div>
       </div>
@@ -181,6 +202,7 @@ export function MainContentArea(props: MainContentAreaProps) {
                     onPlay={() => playFile(f)}
                     onMenuClick={handleMenuClick}
                     addToQueueNext={addToQueueNext}
+                    addToQueueEnd={addToQueueEnd}
                     showToast={showToast}
                   />
                 ))}
@@ -233,6 +255,7 @@ export function MainContentArea(props: MainContentAreaProps) {
                           onDelete={() => deleteFile(f.name)}
                           onMenuClick={handleMenuClick}
                           addToQueueNext={addToQueueNext}
+                          addToQueueEnd={addToQueueEnd}
                           showToast={showToast}
                         />
                       ))}
@@ -260,6 +283,7 @@ export function MainContentArea(props: MainContentAreaProps) {
             playFile={playFile}
             handleMenuClick={handleMenuClick}
             addToQueueNext={addToQueueNext}
+            addToQueueEnd={addToQueueEnd}
             showToast={showToast}
           />
         )}

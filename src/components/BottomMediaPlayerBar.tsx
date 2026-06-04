@@ -1,9 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { MediaFile } from '../types';
 import { Icon } from './ui/Icon';
 import { fmtTime, getGradientFromTitle } from './SongHelpers';
+import { CompressorSettingsModal } from './CompressorSettingsModal';
 
 interface BottomMediaPlayerBarProps {
   currentFile: MediaFile | null;
@@ -46,6 +47,8 @@ export function BottomMediaPlayerBar({
   queueIndex,
   queue
 }: BottomMediaPlayerBarProps) {
+  const [isCompressorOpen, setIsCompressorOpen] = useState(false);
+
   if (!currentFile) return null;
 
   return (
@@ -167,8 +170,15 @@ export function BottomMediaPlayerBar({
       </div>
 
       {/* Right side items: Volume & counters */}
-      <div className="w-56 flex items-center justify-end gap-4 shrink-0">
+      <div className="w-56 flex items-center justify-end gap-3 shrink-0">
         <span className="text-[9px] text-gray-500 font-mono">{queueIndex + 1} / {queue.length} Tracks</span>
+        <button
+          onClick={() => setIsCompressorOpen(true)}
+          className="p-1.5 text-gray-500 hover:text-emerald-400 active:scale-90 transition-transform flex items-center justify-center"
+          title="Volume Compressor Settings"
+        >
+          🎛️
+        </button>
         <div className="flex items-center gap-2">
           <span className="text-xs">{volume > 0 ? '🔊' : '🔇'}</span>
           <input
@@ -182,6 +192,8 @@ export function BottomMediaPlayerBar({
           />
         </div>
       </div>
+      
+      <CompressorSettingsModal isOpen={isCompressorOpen} onClose={() => setIsCompressorOpen(false)} />
     </div>
   );
 }

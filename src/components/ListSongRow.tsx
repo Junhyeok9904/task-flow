@@ -15,6 +15,7 @@ interface ListSongRowProps {
   onDelete: () => void;
   onMenuClick: (e: React.MouseEvent, track: MediaFile) => void;
   addToQueueNext: (file: MediaFile) => void;
+  addToQueueEnd: (file: MediaFile) => void;
   showToast: (msg: string) => void;
 }
 
@@ -29,11 +30,12 @@ export function ListSongRow({
   onDelete,
   onMenuClick,
   addToQueueNext,
+  addToQueueEnd,
   showToast
 }: ListSongRowProps) {
   const { translateX, isSwiping, touchHandlers } = useSwipeToQueue(f, () => {
-    addToQueueNext(f);
-    showToast(`'${f.name.split('/').pop()}'이(가) 대기열에 추가되었습니다.`);
+    addToQueueEnd(f);
+    showToast(`'${f.name.split('/').pop()}'이(가) 대기열 마지막에 추가되었습니다.`);
   });
 
   return (
@@ -81,10 +83,19 @@ export function ListSongRow({
       
       <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-center gap-3">
-          <button onClick={onPlay} className="text-emerald-400 hover:text-emerald-355 font-semibold flex items-center gap-1">
+          <button onClick={onPlay} className="text-emerald-400 hover:text-emerald-355 font-semibold flex items-center gap-1 active:scale-95 transition-transform">
             <Icon name="play" size={14} className="fill-emerald-400/20" /> Play
           </button>
-          <button onClick={onDelete} className="text-rose-400 hover:text-rose-350 font-semibold flex items-center gap-1">
+          <button 
+            onClick={() => {
+              addToQueueEnd(f);
+              showToast(`'${f.name.split('/').pop()}'이(가) 대기열 마지막에 추가되었습니다.`);
+            }} 
+            className="text-teal-400 hover:text-teal-300 font-semibold flex items-center gap-1 active:scale-95 transition-transform"
+          >
+            <Icon name="plus" size={14} /> Queue
+          </button>
+          <button onClick={onDelete} className="text-rose-400 hover:text-rose-350 font-semibold flex items-center gap-1 active:scale-95 transition-transform">
             <Icon name="trash" size={14} /> Del
           </button>
           <button 

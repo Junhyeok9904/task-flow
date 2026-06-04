@@ -15,6 +15,7 @@ interface GridSongCardProps {
   onPlay: () => void;
   onMenuClick: (e: React.MouseEvent, track: MediaFile) => void;
   addToQueueNext: (file: MediaFile) => void;
+  addToQueueEnd: (file: MediaFile) => void;
   showToast: (msg: string) => void;
 }
 
@@ -28,11 +29,12 @@ export function GridSongCard({
   onPlay,
   onMenuClick,
   addToQueueNext,
+  addToQueueEnd,
   showToast
 }: GridSongCardProps) {
   const { translateX, isSwiping, touchHandlers } = useSwipeToQueue(f, () => {
-    addToQueueNext(f);
-    showToast(`'${f.name.split('/').pop()}'이(가) 대기열에 추가되었습니다.`);
+    addToQueueEnd(f);
+    showToast(`'${f.name.split('/').pop()}'이(가) 대기열 마지막에 추가되었습니다.`);
   });
 
   const waveform = getMockWaveform(f.name);
@@ -95,16 +97,28 @@ export function GridSongCard({
         </div>
 
         {/* Center Part: Waveform & Play button overlay */}
-        <div className="flex items-center gap-3 mt-4">
+        <div className="flex items-center gap-2.5 mt-4">
           <button
             onClick={(e) => { e.stopPropagation(); onPlay(); }}
-            className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shadow transition-all duration-300 scale-95 hover:scale-100 active:scale-90 bg-black/40 border border-white/10"
+            className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shadow transition-all duration-300 scale-95 hover:scale-100 active:scale-90 bg-black/40 border border-white/10 shrink-0"
           >
             <img 
               src={isPlayingFile ? "/images/premium_pause_icon.png" : "/images/premium_play_icon.png"} 
               alt={isPlayingFile ? "Pause" : "Play"} 
               className="w-full h-full object-cover scale-110"
             />
+          </button>
+
+          <button
+             onClick={(e) => {
+               e.stopPropagation();
+               addToQueueEnd(f);
+               showToast(`'${f.name.split('/').pop()}'이(가) 대기열 마지막에 추가되었습니다.`);
+             }}
+            className="w-8 h-8 rounded-full flex items-center justify-center shadow transition-all duration-300 scale-95 hover:scale-100 active:scale-90 bg-black/40 border border-white/10 text-emerald-400 hover:text-emerald-300 hover:bg-[#1b2f28]/60 hover:border-emerald-500/30 text-sm font-extrabold shrink-0"
+            title="대기열에 추가"
+          >
+            ＋
           </button>
 
           <WaveformVisualizer waveform={waveform} isPlayingFile={isPlayingFile} />

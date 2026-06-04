@@ -44,4 +44,6 @@ next-env.d.ts
 /public/media/
 /public/covers/
 data/playlists.json
-data/playlists.json
+data/tasks.json
+data/media.json
+scripts/discord-webhook.txt
