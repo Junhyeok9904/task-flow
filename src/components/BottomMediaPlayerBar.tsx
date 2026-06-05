@@ -5,6 +5,7 @@ import { MediaFile } from '../types';
 import { Icon } from './ui/Icon';
 import { fmtTime, getGradientFromTitle } from './SongHelpers';
 import { CompressorSettingsModal } from './CompressorSettingsModal';
+import { CompressorMode } from '../contexts/AudioProvider';
 
 interface BottomMediaPlayerBarProps {
   currentFile: MediaFile | null;
@@ -25,6 +26,7 @@ interface BottomMediaPlayerBarProps {
   setVolume: (val: number) => void;
   queueIndex: number;
   queue: MediaFile[];
+  compressorMode: CompressorMode;
 }
 
 export function BottomMediaPlayerBar({
@@ -45,7 +47,8 @@ export function BottomMediaPlayerBar({
   volume,
   setVolume,
   queueIndex,
-  queue
+  queue,
+  compressorMode
 }: BottomMediaPlayerBarProps) {
   const [isCompressorOpen, setIsCompressorOpen] = useState(false);
 
@@ -174,8 +177,12 @@ export function BottomMediaPlayerBar({
         <span className="text-[9px] text-gray-500 font-mono">{queueIndex + 1} / {queue.length} Tracks</span>
         <button
           onClick={() => setIsCompressorOpen(true)}
-          className="p-1.5 text-gray-500 hover:text-emerald-400 active:scale-90 transition-transform flex items-center justify-center"
-          title="Volume Compressor Settings"
+          className={`p-1.5 active:scale-90 transition-all flex items-center justify-center rounded-lg ${
+            compressorMode !== 'off'
+              ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 shadow-[0_0_8px_rgba(16,185,129,0.2)]'
+              : 'text-gray-500 hover:text-emerald-400'
+          }`}
+          title="실시간 볼륨 평준화 (스마트 볼륨)"
         >
           🎛️
         </button>

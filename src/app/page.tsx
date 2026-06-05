@@ -88,7 +88,7 @@ function HomeContent() {
         </aside>
       </div>
 
-      <BottomMediaPlayerBar {...state} />
+      <BottomMediaPlayerBar {...state} compressorMode={state.compressorMode} />
       <ConfirmModalGroup
         duplicateModal={state.duplicateModal}
         setDuplicateModal={state.setDuplicateModal}

@@ -12,9 +12,9 @@ export async function POST(request: Request) {
 
     if (action === 'start') {
       const port = process.env.PORT || '3000';
-      const res = await startTunnel(port);
-      if (res.error) {
-        return NextResponse.json({ error: res.error }, { status: 500 });
+      const res = startTunnel(port);
+      if (res.status === 'error') {
+        return NextResponse.json({ error: res.error || res.message }, { status: 500 });
       }
       return NextResponse.json(res);
     }

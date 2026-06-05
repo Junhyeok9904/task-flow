@@ -19,6 +19,8 @@ interface PlaylistExplorerSidebarProps {
   isTunneling: boolean;
   tunnelUrl: string | null;
   tunnelLoading: boolean;
+  tunnelProgress: number;
+  tunnelProgressMsg: string;
   toggleTunnel: () => void;
   showAlert: (title: string, msg: string, isDanger?: boolean) => void;
   currentFile: MediaFile | null;
@@ -39,6 +41,8 @@ export function PlaylistExplorerSidebar({
   isTunneling,
   tunnelUrl,
   tunnelLoading,
+  tunnelProgress,
+  tunnelProgressMsg,
   toggleTunnel,
   showAlert,
   currentFile,
@@ -190,8 +194,23 @@ export function PlaylistExplorerSidebar({
                 : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
           } ${tunnelLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
-          {isDocker ? 'Managed by Docker' : tunnelLoading ? 'Wait...' : isTunneling ? 'Stop Tunnel' : 'Start Public Tunnel'}
+          {isDocker ? 'Managed by Docker' : tunnelLoading ? 'Connecting...' : isTunneling ? 'Stop Tunnel' : 'Start Public Tunnel'}
         </button>
+        
+        {tunnelLoading && (
+          <div className="space-y-1.5 pt-1">
+            <div className="flex justify-between text-[8px] font-bold text-emerald-400">
+              <span className="truncate max-w-[140px]">{tunnelProgressMsg || '연결 준비 중...'}</span>
+              <span className="font-mono">{tunnelProgress}%</span>
+            </div>
+            <div className="w-full h-1 bg-gray-800 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] transition-all duration-300"
+                style={{ width: `${tunnelProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
         
         {isTunneling && tunnelUrl && (
           <div className="space-y-2 pt-1.5 border-t border-white/5">

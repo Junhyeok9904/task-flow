@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAudioPlayer } from '../contexts/AudioProvider';
 import { Icon } from './ui/Icon';
 import { MediaFile, Playlist } from '../types';
+import { CompressorSettingsModal } from './CompressorSettingsModal';
 
 function fmtTime(s: number) {
   if (!isFinite(s) || isNaN(s)) return '00:00';
@@ -148,12 +149,14 @@ export function MobileContainer() {
     showToast,
     playFromQueue,
     removeFromQueue,
+    compressorMode,
   } = useAudioPlayer();
 
   // Mobile layout state
   const [isMobilePlayerOpen, setIsMobilePlayerOpen] = useState(false);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [isAddToPlaylistOpen, setIsAddToPlaylistOpen] = useState(false);
+  const [isCompressorOpen, setIsCompressorOpen] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'nowplaying' | 'queue'>('nowplaying');
 
   // Swipe-to-close gestures for full screen player
@@ -570,6 +573,17 @@ export function MobileContainer() {
                 className="flex-1 h-1 bg-gray-800 rounded-full appearance-none accent-emerald-500 cursor-pointer"
               />
               <button 
+                onClick={() => setIsCompressorOpen(true)}
+                className={`p-1.5 active:scale-90 transition-all flex items-center justify-center rounded-lg shrink-0 ${
+                  compressorMode !== 'off'
+                    ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 shadow-[0_0_8px_rgba(16,185,129,0.2)]'
+                    : 'text-gray-500 hover:text-emerald-400'
+                }`}
+                title="실시간 볼륨 평준화 (스마트 볼륨)"
+              >
+                🎛️
+              </button>
+              <button 
                 onClick={() => setVolume(1)}
                 className="text-emerald-400 hover:text-emerald-300 transition active:scale-95 shrink-0 flex items-center justify-center"
                 title="Max Volume"
@@ -618,6 +632,8 @@ export function MobileContainer() {
               </div>
             </div>
           )}
+
+          <CompressorSettingsModal isOpen={isCompressorOpen} onClose={() => setIsCompressorOpen(false)} />
 
         </div>
       )}

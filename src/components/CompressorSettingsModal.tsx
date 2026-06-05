@@ -53,7 +53,7 @@ export function CompressorSettingsModal({ isOpen, onClose }: CompressorSettingsM
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto space-y-6">
+        <div className="p-6 overflow-y-auto space-y-6 flex-1 min-h-0">
           <p className="text-[10px] text-gray-400 leading-relaxed">
             곡별로 소리가 너무 작거나 너무 큰 편차를 줄여 실시간으로 고른 볼륨을 제공합니다. 
             야간 모드는 갑자기 큰 소리가 나는 것을 억제해 줍니다.
